@@ -352,6 +352,7 @@ var AgenteMod = {
     var cerrarBtn = document.getElementById('agenteCerrarBtn');
     if (cerrarBtn) cerrarBtn.classList.toggle('hidden', !this.get());
     document.getElementById('agenteModal').classList.add('show');
+    App.pushNavState();
   },
   closeModal: function(){
     if (!this.get()) return; // no se puede cerrar sin ingresar el código
@@ -391,6 +392,7 @@ var OrdMod = {
     if (input) input.value = '';
     this.renderList('');
     document.getElementById('ordenativoModal').classList.add('show');
+    App.pushNavState();
   },
   closeModal: function(){
     document.getElementById('ordenativoModal').classList.remove('show');
@@ -559,6 +561,13 @@ var App = {
     if (!AgenteMod.get()){
       setTimeout(function(){ AgenteMod.openModal(); }, 300);
     }
+    window.addEventListener('popstate', function(){ App.handleHardwareBack(); });
+  },
+
+  /* Empuja un estado al historial del navegador para que el botón/gesto
+     "volver" del celular navegue dentro de la app en vez de salir de ella. */
+  pushNavState: function(){
+    try { history.pushState({navid: Date.now()}, ''); } catch(e){}
   },
 
   showScreen: function(name){
@@ -574,6 +583,7 @@ var App = {
   },
 
   goHome: function(){
+    if (this.stack.length > 1){ this.pushNavState(); }
     this.stack = ['home'];
     this.renderHome();
     this.showScreen('home');
@@ -582,6 +592,7 @@ var App = {
   },
 
   goExport: function(){
+    this.pushNavState();
     this.stack.push('export');
     this.renderExport();
     this.showScreen('export');
@@ -589,12 +600,56 @@ var App = {
     document.getElementById('hdrSub').textContent = 'CSV / PDF';
   },
 
+  /* Botón ‹ de la cabecera: delega en el navegador para que quede
+     sincronizado con el botón/gesto físico de volver del celular. */
   back: function(){
+    history.back();
+  },
+
+  /* Se ejecuta cuando el usuario vuelve con el botón/gesto del celular
+     (o cuando back() delega en el navegador). Si hay un modal abierto,
+     lo cierra primero; si no, desapila la pantalla anterior. */
+  handleHardwareBack: function(){
+    var ordModal = document.getElementById('ordenativoModal');
+    var agModal = document.getElementById('agenteModal');
+    if (ordModal && ordModal.classList.contains('show')){
+      OrdMod.closeModal();
+      this.pushNavState();
+      return;
+    }
+    if (agModal && agModal.classList.contains('show')){
+      if (AgenteMod.get()){
+        AgenteMod.closeModal();
+        this.pushNavState();
+      } else {
+        // sin código ingresado: no se puede cerrar, se re-empuja el estado
+        this.pushNavState();
+      }
+      return;
+    }
     if (this.stack.length > 1){ this.stack.pop(); }
     var prev = this.stack[this.stack.length-1];
-    if (prev === 'home'){ this.goHome(); }
-    else if (prev === 'zona'){ this.openZona(this.currentZona, true); }
-    else { this.goHome(); }
+    if (prev === 'home'){
+      this.renderHome();
+      this.showScreen('home');
+      document.getElementById('hdrTitle').textContent = 'GU T1 · Lectura';
+      document.getElementById('hdrSub').textContent = 'DPEC · Grandes Usuarios';
+    } else if (prev === 'zona'){
+      this.openZona(this.currentZona, true);
+    } else if (prev === 'detail'){
+      Detail.render(this.currentMed);
+      document.getElementById('hdrTitle').textContent = 'N° '+this.currentMed;
+      document.getElementById('hdrSub').textContent = 'Carga de lectura';
+      this.showScreen('detail');
+    } else if (prev === 'export'){
+      this.renderExport();
+      document.getElementById('hdrTitle').textContent = 'Exportar';
+      document.getElementById('hdrSub').textContent = 'CSV / PDF';
+      this.showScreen('export');
+    } else {
+      this.renderHome();
+      this.showScreen('home');
+    }
   },
 
   showSyncInfo: function(){
@@ -679,7 +734,7 @@ var App = {
   /* ---- ZONA ---- */
   openZona: function(zona, isBack){
     this.currentZona = zona;
-    if (!isBack){ this.stack.push('zona'); }
+    if (!isBack){ this.pushNavState(); this.stack.push('zona'); }
     document.getElementById('hdrTitle').textContent = zona;
     document.getElementById('hdrSub').textContent = 'GU T1 · Grandes Usuarios';
     document.getElementById('zonaSearch').value = '';
@@ -731,6 +786,7 @@ var App = {
   /* ---- DETALLE ---- */
   openDetail: function(med){
     this.currentMed = med;
+    this.pushNavState();
     this.stack.push('detail');
     Detail.render(med);
     document.getElementById('hdrTitle').textContent = 'N° '+med;
@@ -829,6 +885,10 @@ var Detail = {
       '<div class="dh-badges"><span class="tag">'+escHtml(u.zona)+'</span><span class="tag">'+escHtml(u.ug)+'</span></div>' +
     '</div>' +
 
+    '<div class="agente-current" style="cursor:pointer; margin-bottom:12px" onclick="AgenteMod.openModal()">' +
+      'Operando: <b>'+(AgenteMod.label() ? escHtml(AgenteMod.label()) : 'sin ingresar — tocar para ingresar código')+'</b>' +
+    '</div>' +
+
     '<fieldset><legend>Lectura</legend>' +
       '<label class="flabel">Lectura del medidor</label>' +
       '<input type="text" id="fLectura" placeholder="Ej: 004521 o A0452" value="'+escAttr(this.data.lectura)+'">' +
@@ -849,12 +909,6 @@ var Detail = {
       '<div id="cambioBlock" class="'+(this.data.cambioMedidor?'':'hidden')+'">' +
         '<label class="flabel">N° de medidor anterior (retirado)</label>' +
         '<input type="text" id="fMedAnterior" placeholder="N° medidor retirado" value="'+escAttr(this.data.medidorAnterior)+'">' +
-      '</div>' +
-    '</fieldset>' +
-
-    '<fieldset><legend>Agente</legend>' +
-      '<div class="agente-current" style="cursor:pointer" onclick="AgenteMod.openModal()">' +
-        'Operando: <b>'+(AgenteMod.label() ? escHtml(AgenteMod.label()) : 'sin ingresar — tocar para ingresar código')+'</b>' +
       '</div>' +
     '</fieldset>' +
 
