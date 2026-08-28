@@ -65,15 +65,16 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 
 /* ---- search / filters ---- */
 .searchbar{
-  display:flex; gap:8px; align-items:center;
-  background:var(--panel); border:1px solid var(--border); border-radius:12px;
-  padding:9px 12px; margin-bottom:10px;
+  display:flex; gap:10px; align-items:center;
+  background:var(--panel); border:1px solid var(--border); border-radius:14px;
+  padding:15px 16px; margin-bottom:10px;
 }
+.searchbar span:first-child{font-size:19px;}
 .searchbar input{
-  flex:1; background:none; border:none; outline:none; color:var(--text); font-size:15px;
+  flex:1; background:none; border:none; outline:none; color:var(--text); font-size:17px;
 }
 .searchbar input::placeholder{color:var(--text-dim);}
-.searchbar .clr{color:var(--text-dim); cursor:pointer; font-size:16px; padding:2px 4px;}
+.searchbar .clr{color:var(--text-dim); cursor:pointer; font-size:19px; padding:2px 6px;}
 
 /* ---- summary strip ---- */
 .summary-strip{
@@ -114,6 +115,8 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 .user-card .u-top{display:flex; justify-content:space-between; gap:8px; align-items:flex-start;}
 .user-card .u-nom{font-weight:600; font-size:14px; flex:1; min-width:0;}
 .user-card .u-med{font-size:12.5px; color:var(--amber); font-weight:600; white-space:nowrap;}
+.user-card .u-lapiz{font-size:14px; white-space:nowrap;}
+.tag.tag-cambio{color:var(--amber); border-color:var(--amber-dim);}
 .user-card .u-dir{font-size:12px; color:var(--text-dim); margin-top:2px;}
 .user-card .u-tags{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
 .tag{font-size:10.5px; padding:2px 7px; border-radius:20px; background:var(--panel2); color:var(--text-dim); border:1px solid var(--border);}
@@ -143,18 +146,6 @@ textarea{resize:vertical; min-height:56px;}
 .chk-row{display:flex; align-items:center; gap:9px; margin-top:10px;}
 .chk-row input[type=checkbox]{width:19px; height:19px; accent-color:var(--amber);}
 .chk-row label{font-size:13.5px; color:var(--text);}
-
-.photo-row{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;}
-.photo-thumb{position:relative; width:84px; height:84px; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--bg2);}
-.photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
-.photo-thumb .rm{position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:13px; line-height:1;}
-.photobtn{
-  width:84px; height:84px; border-radius:9px; border:1.5px dashed var(--border); background:var(--bg2);
-  color:var(--text-dim); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
-  font-size:11px; cursor:pointer;
-}
-.photobtn .plus{font-size:22px; color:var(--amber); line-height:1;}
-.photobtn input[type=file]{position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;}
 
 .gps-status{font-size:11.5px; color:var(--text-dim); margin-top:6px; display:flex; align-items:center; gap:5px;}
 .gps-status.ok{color:var(--green);}
@@ -285,13 +276,6 @@ nav.bottomnav button.active{color:var(--amber);}
 
 <div id="toast"></div>
 
-<div class="modal-bg" id="photoModal" onclick="if(event.target===this) this.classList.remove('show')">
-  <div class="modal-box">
-    <h3>Foto</h3>
-    <img id="photoModalImg" src="">
-  </div>
-</div>
-
 <div class="modal-bg" id="agenteModal">
   <div class="modal-box">
     <h3>Ingresar operario</h3>
@@ -319,12 +303,12 @@ var AGENTE_KEY = 'gu_t1_agente';
 var AgenteMod = {
   get: function(){
     try {
-      var raw = localStorage.getItem(AGENTE_KEY);
+      var raw = sessionStorage.getItem(AGENTE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch(e){ return null; }
   },
   set: function(agente){
-    try { localStorage.setItem(AGENTE_KEY, JSON.stringify(agente)); } catch(e){}
+    try { sessionStorage.setItem(AGENTE_KEY, JSON.stringify(agente)); } catch(e){}
   },
   label: function(){
     var a = this.get();
@@ -668,11 +652,15 @@ var App = {
       '<div class="detail-head">' +
         '<h2>Exportar relevamiento</h2>' +
         '<div class="dh-row"><b>'+done+'</b> de <b>'+total+'</b> medidores cargados</div>' +
-        '<div class="dh-row">Los datos quedan guardados en este dispositivo (offline). Exportá seguido para respaldar.</div>' +
+        '<div class="dh-row">Los datos quedan guardados en este dispositivo (offline). Exportá seguido para respaldar, tomaste todos los medidores o no.</div>' +
       '</div>' +
-      '<fieldset><legend>CSV</legend>' +
-        '<p class="dh-row" style="margin-top:0">Planilla completa, separada por punto y coma, compatible con Excel (Argentina).</p>' +
-        '<button class="primary" style="width:100%" onclick="ExportMod.exportCSV()">⬇️ Descargar CSV</button>' +
+      '<fieldset><legend>Enviar ahora (sin cable)</legend>' +
+        '<p class="dh-row" style="margin-top:0">Abre el menú para compartir de Android: WhatsApp, correo, Bluetooth o "Compartir cerca / Nearby Share" con otro celular o PC.</p>' +
+        '<button class="primary" style="width:100%" onclick="ExportMod.shareCSV()">📤 Enviar CSV inalámbrico</button>' +
+      '</fieldset>' +
+      '<fieldset><legend>Descargar (para pasar por cable)</legend>' +
+        '<p class="dh-row" style="margin-top:0">Guarda el CSV en el almacenamiento del celular. Después conectás el cable USB a la PC y lo copiás desde la carpeta de Descargas.</p>' +
+        '<button class="secondary" style="width:100%" onclick="ExportMod.exportCSV()">⬇️ Descargar CSV</button>' +
       '</fieldset>' +
       '<fieldset><legend>PDF</legend>' +
         '<p class="dh-row" style="margin-top:0">Genera una planilla imprimible. Se abre el diálogo de impresión: elegí "Guardar como PDF".</p>' +
@@ -701,10 +689,13 @@ function renderUserCard(u){
     var info = estadoInfo(r.estado);
     if (info){ stCls = info.cls; stLabel = info.label; cardCls = info.cls; }
   }
-  var camb = (r && r.cambioMedidor) ? '<span class="tag">Cambio medidor</span>' : '';
+  var esCambio = !!(r && r.cambioMedidor);
+  var camb = esCambio ? '<span class="tag tag-cambio">🖍️ Cambio medidor</span>' : '';
+  var lapiz = esCambio ? '<span class="u-lapiz" title="Cambio de medidor">🖍️</span>' : '';
   return '<div class="user-card '+cardCls+'" onclick="App.openDetail(\''+escAttr(u.med)+'\')">' +
     '<div class="u-top">' +
       '<div class="u-nom">'+escHtml(u.nom)+'</div>' +
+      lapiz +
       '<div class="u-med">#'+escHtml(u.med)+'</div>' +
     '</div>' +
     '<div class="u-dir">'+escHtml(u.dir)+' · '+escHtml(u.tipo)+'</div>' +
@@ -730,10 +721,8 @@ var Detail = {
       lectura: saved.lectura || '',
       estado: saved.estado || '',
       obs: saved.obs || '',
-      fotoMedidor: saved.fotoMedidor || null,
       cambioMedidor: !!saved.cambioMedidor,
       medidorAnterior: saved.medidorAnterior || '',
-      fotoAnterior: saved.fotoAnterior || null,
       lat: saved.lat || null,
       lng: saved.lng || null,
       gpsAt: saved.gpsAt || null,
@@ -763,8 +752,6 @@ var Detail = {
       '<select id="fEstado">'+estadoOptions+'</select>' +
       '<label class="flabel">Observaciones</label>' +
       '<textarea id="fObs" placeholder="Notas adicionales...">'+escHtml(this.data.obs)+'</textarea>' +
-      '<label class="flabel">Foto del medidor</label>' +
-      '<div class="photo-row" id="photoRowMedidor"></div>' +
     '</fieldset>' +
 
     '<fieldset><legend>Cambio de medidor</legend>' +
@@ -775,8 +762,6 @@ var Detail = {
       '<div id="cambioBlock" class="'+(this.data.cambioMedidor?'':'hidden')+'">' +
         '<label class="flabel">N° de medidor anterior (retirado)</label>' +
         '<input type="text" id="fMedAnterior" placeholder="N° medidor retirado" value="'+escAttr(this.data.medidorAnterior)+'">' +
-        '<label class="flabel">Foto del medidor anterior</label>' +
-        '<div class="photo-row" id="photoRowAnterior"></div>' +
       '</div>' +
     '</fieldset>' +
 
@@ -796,8 +781,6 @@ var Detail = {
     '</div>';
 
     document.getElementById('screen-detail').innerHTML = html;
-    this.renderPhotos('photoRowMedidor', 'fotoMedidor');
-    this.renderPhotos('photoRowAnterior', 'fotoAnterior');
     this.updateGpsUI();
     this.captureGpsSilently();
   },
@@ -806,45 +789,6 @@ var Detail = {
     var chk = document.getElementById('fCambio').checked;
     this.data.cambioMedidor = chk;
     document.getElementById('cambioBlock').classList.toggle('hidden', !chk);
-  },
-
-  renderPhotos: function(containerId, field){
-    var el = document.getElementById(containerId);
-    if (!el) return;
-    var photo = this.data[field];
-    var html = '';
-    if (photo){
-      html += '<div class="photo-thumb" onclick="Detail.viewPhoto(\''+field+'\')">' +
-                '<img src="'+photo+'">' +
-                '<button class="rm" onclick="event.stopPropagation();Detail.removePhoto(\''+field+'\',\''+containerId+'\')">✕</button>' +
-              '</div>';
-    } else {
-      html += '<label class="photobtn">' +
-                '<span class="plus">＋</span>Foto' +
-                '<input type="file" accept="image/*" capture="environment" onchange="Detail.onPhotoSelected(event,\''+field+'\',\''+containerId+'\')">' +
-              '</label>';
-    }
-    el.innerHTML = html;
-  },
-
-  onPhotoSelected: function(ev, field, containerId){
-    var file = ev.target.files && ev.target.files[0];
-    if (!file) return;
-    var self = this;
-    compressImage(file, 1280, 0.72, function(dataUrl){
-      self.data[field] = dataUrl;
-      self.renderPhotos(containerId, field);
-    });
-  },
-  removePhoto: function(field, containerId){
-    this.data[field] = null;
-    this.renderPhotos(containerId, field);
-  },
-  viewPhoto: function(field){
-    var photo = this.data[field];
-    if (!photo) return;
-    document.getElementById('photoModalImg').src = photo;
-    document.getElementById('photoModal').classList.add('show');
   },
 
   updateGpsUI: function(){
@@ -903,10 +847,8 @@ var Detail = {
       lectura: lectura,
       estado: estado,
       obs: obs,
-      fotoMedidor: this.data.fotoMedidor,
       cambioMedidor: this.data.cambioMedidor,
       medidorAnterior: this.data.cambioMedidor ? medAnterior : '',
-      fotoAnterior: this.data.cambioMedidor ? this.data.fotoAnterior : null,
       lat: this.data.lat,
       lng: this.data.lng,
       gpsAt: this.data.gpsAt,
@@ -927,27 +869,6 @@ var Detail = {
   }
 };
 
-/* Redimensiona/comprime una imagen a dataURL JPEG para no saturar IndexedDB */
-function compressImage(file, maxSize, quality, cb){
-  var reader = new FileReader();
-  reader.onload = function(e){
-    var img = new Image();
-    img.onload = function(){
-      var w = img.width, h = img.height;
-      if (w > h){ if (w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; } }
-      else { if (h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; } }
-      var canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      cb(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = function(){ cb(e.target.result); };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
 /* ---------------- Export CSV / PDF ---------------- */
 var ExportMod = {
   buildRows: function(){
@@ -965,33 +886,59 @@ var ExportMod = {
         lat: r.lat != null ? r.lat : '', lng: r.lng != null ? r.lng : '',
         obs: r.obs || '', obsListado: u.obs || '',
         fecha: r.timestamp ? r.timestamp.replace('T',' ').substring(0,16) : '',
-        agente: r.agenteNombre || '', agenteCod: r.agenteCod || '',
-        tieneFotoMedidor: r.fotoMedidor ? 'SI' : 'NO',
-        tieneFotoAnterior: r.fotoAnterior ? 'SI' : 'NO'
+        agente: r.agenteNombre || '', agenteCod: r.agenteCod || ''
       });
     }
     return rows;
   },
 
-  exportCSV: function(){
+  buildCSVBlob: function(){
     var rows = this.buildRows();
     var headers = ['Zona','N° Medidor','Cliente','US','Instalación','Dirección','Tipo','UG',
       'Lectura','Estado','Cambio Medidor','Medidor Anterior','Latitud','Longitud',
       'Observación Lecturista','Observación Listado','Fecha/Hora',
-      'Agente','Cod. Agente','Foto Medidor','Foto Anterior'];
+      'Agente','Cod. Agente'];
     var lines = [headers.join(';')];
     for (var i=0;i<rows.length;i++){
       var r = rows[i];
       var vals = [r.zona,r.med,r.nom,r.us,r.inst,r.dir,r.tipo,r.ug,r.lectura,r.estado,
         r.cambioMedidor,r.medidorAnterior,r.lat,r.lng,r.obs,r.obsListado,r.fecha,
-        r.agente,r.agenteCod,r.tieneFotoMedidor,r.tieneFotoAnterior];
+        r.agente,r.agenteCod];
       lines.push(vals.map(csvEscape).join(';'));
     }
     var csv = '\uFEFF' + lines.join('\r\n');
-    var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    return new Blob([csv], {type:'text/csv;charset=utf-8'});
+  },
+
+  exportCSV: function(){
+    var blob = this.buildCSVBlob();
     var fecha = new Date().toISOString().substring(0,10);
     downloadBlob(blob, 'GU_T1_' + fecha + '.csv');
     toast('CSV descargado');
+  },
+
+  shareCSV: function(){
+    var blob = this.buildCSVBlob();
+    var fecha = new Date().toISOString().substring(0,10);
+    var filename = 'GU_T1_' + fecha + '.csv';
+
+    if (navigator.canShare && navigator.share){
+      try {
+        var file = new File([blob], filename, {type:'text/csv'});
+        if (navigator.canShare({files:[file]})){
+          navigator.share({
+            files:[file],
+            title:'GU T1 · Relevamiento',
+            text:'Relevamiento GU T1 - ' + fecha
+          })['catch'](function(err){
+            if (err && err.name !== 'AbortError') toast('No se pudo enviar. Probá descargarlo.');
+          });
+          return;
+        }
+      } catch(e){}
+    }
+    toast('Este celular no admite enviar archivos así. Descargalo y mandalo por WhatsApp.');
+    this.exportCSV();
   },
 
   exportPDF: function(){
