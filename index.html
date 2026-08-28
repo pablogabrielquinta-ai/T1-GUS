@@ -65,16 +65,16 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 
 /* ---- search / filters ---- */
 .searchbar{
-  display:flex; gap:10px; align-items:center;
-  background:var(--panel); border:1px solid var(--border); border-radius:14px;
-  padding:15px 16px; margin-bottom:10px;
+  display:flex; gap:12px; align-items:center;
+  background:var(--panel); border:1px solid var(--border); border-radius:16px;
+  padding:19px 18px; margin-bottom:10px;
 }
-.searchbar span:first-child{font-size:19px;}
+.searchbar span:first-child{font-size:22px;}
 .searchbar input{
-  flex:1; background:none; border:none; outline:none; color:var(--text); font-size:17px;
+  flex:1; background:none; border:none; outline:none; color:var(--text); font-size:18px;
 }
 .searchbar input::placeholder{color:var(--text-dim);}
-.searchbar .clr{color:var(--text-dim); cursor:pointer; font-size:19px; padding:2px 6px;}
+.searchbar .clr{color:var(--text-dim); cursor:pointer; font-size:21px; padding:2px 6px;}
 
 /* ---- summary strip ---- */
 .summary-strip{
@@ -238,7 +238,7 @@ nav.bottomnav button.active{color:var(--amber);}
   <section class="screen" id="screen-home">
     <div class="searchbar">
       <span>🔍</span>
-      <input type="text" id="globalSearch" placeholder="Buscar por N° medidor, cliente, dirección, US...">
+      <input type="text" id="globalSearch" placeholder="Buscar por N° medidor, cliente, dirección, tipo...">
       <span class="clr hidden" id="globalSearchClr" onclick="App.clearGlobalSearch()">✕</span>
     </div>
     <div id="globalResults" class="user-list hidden"></div>
@@ -285,7 +285,7 @@ nav.bottomnav button.active{color:var(--amber);}
     <input type="text" inputmode="numeric" id="agenteCodeInput" placeholder="Ej: 703" onkeydown="if(event.key==='Enter') AgenteMod.loginByCode()">
     <button class="primary" style="width:100%; margin-top:10px" onclick="AgenteMod.loginByCode()">Ingresar</button>
     <div class="btnrow" style="margin-top:12px">
-      <button class="secondary" onclick="AgenteMod.closeModal()">Cerrar</button>
+      <button class="secondary hidden" id="agenteCerrarBtn" onclick="AgenteMod.closeModal()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -319,9 +319,12 @@ var AgenteMod = {
     this.render();
     var input = document.getElementById('agenteCodeInput');
     if (input) input.value = '';
+    var cerrarBtn = document.getElementById('agenteCerrarBtn');
+    if (cerrarBtn) cerrarBtn.classList.toggle('hidden', !this.get());
     document.getElementById('agenteModal').classList.add('show');
   },
   closeModal: function(){
+    if (!this.get()) return; // no se puede cerrar sin ingresar el código
     document.getElementById('agenteModal').classList.remove('show');
   },
 
@@ -577,7 +580,8 @@ var App = {
              u.nom.toLowerCase().indexOf(q)>=0 ||
              u.dir.toLowerCase().indexOf(q)>=0 ||
              u.us.toLowerCase().indexOf(q)>=0 ||
-             u.inst.toLowerCase().indexOf(q)>=0;
+             u.inst.toLowerCase().indexOf(q)>=0 ||
+             u.tipo.toLowerCase().indexOf(q)>=0;
     }).slice(0,60);
     resultsEl.innerHTML = matches.length ? matches.map(renderUserCard).join('') :
       '<div class="empty">Sin resultados para "'+escHtml(q)+'"</div>';
@@ -618,7 +622,8 @@ var App = {
         return u.med.toLowerCase().indexOf(ql)>=0 ||
                u.nom.toLowerCase().indexOf(ql)>=0 ||
                u.dir.toLowerCase().indexOf(ql)>=0 ||
-               u.us.toLowerCase().indexOf(ql)>=0;
+               u.us.toLowerCase().indexOf(ql)>=0 ||
+               u.tipo.toLowerCase().indexOf(ql)>=0;
       });
     }
     document.getElementById('zonaUserList').innerHTML = list.length ? list.map(renderUserCard).join('') :
@@ -763,10 +768,6 @@ var Detail = {
         '<label class="flabel">N° de medidor anterior (retirado)</label>' +
         '<input type="text" id="fMedAnterior" placeholder="N° medidor retirado" value="'+escAttr(this.data.medidorAnterior)+'">' +
       '</div>' +
-    '</fieldset>' +
-
-    '<fieldset><legend>Ubicación</legend>' +
-      '<div class="gps-status" id="gpsStatus"><span class="dot"></span><span id="gpsText">Sin capturar</span></div>' +
     '</fieldset>' +
 
     '<fieldset><legend>Agente</legend>' +
