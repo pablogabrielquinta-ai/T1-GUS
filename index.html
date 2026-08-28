@@ -340,6 +340,9 @@ var AgenteMod = {
   set: function(agente){
     try { sessionStorage.setItem(AGENTE_KEY, JSON.stringify(agente)); } catch(e){}
   },
+  clear: function(){
+    try { sessionStorage.removeItem(AGENTE_KEY); } catch(e){}
+  },
   label: function(){
     var a = this.get();
     return a ? (a.nombre + (a.cod ? ' (Cod. ' + a.cod + ')' : '')) : null;
@@ -562,6 +565,25 @@ var App = {
       setTimeout(function(){ AgenteMod.openModal(); }, 300);
     }
     window.addEventListener('popstate', function(){ App.handleHardwareBack(); });
+    App.initSessionExpiry();
+  },
+
+  /* Si la app estuvo en segundo plano más de 5 minutos, al volver
+     se le vuelve a pedir el código de operario (sesión vencida). */
+  initSessionExpiry: function(){
+    var HIDDEN_LIMIT_MS = 5 * 60 * 1000;
+    var hiddenAt = null;
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'hidden'){
+        hiddenAt = Date.now();
+      } else if (document.visibilityState === 'visible'){
+        if (hiddenAt && (Date.now() - hiddenAt) > HIDDEN_LIMIT_MS){
+          AgenteMod.clear();
+          setTimeout(function(){ AgenteMod.openModal(); }, 200);
+        }
+        hiddenAt = null;
+      }
+    });
   },
 
   /* Empuja un estado al historial del navegador para que el botón/gesto
