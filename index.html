@@ -144,6 +144,18 @@ textarea{resize:vertical; min-height:56px;}
 .chk-row input[type=checkbox]{width:19px; height:19px; accent-color:var(--amber);}
 .chk-row label{font-size:13.5px; color:var(--text);}
 
+.photo-row{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;}
+.photo-thumb{position:relative; width:84px; height:84px; border-radius:9px; overflow:hidden; border:1px solid var(--border); background:var(--bg2);}
+.photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+.photo-thumb .rm{position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:13px; line-height:1;}
+.photobtn{
+  width:84px; height:84px; border-radius:9px; border:1.5px dashed var(--border); background:var(--bg2);
+  color:var(--text-dim); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  font-size:11px; cursor:pointer;
+}
+.photobtn .plus{font-size:22px; color:var(--amber); line-height:1;}
+.photobtn input[type=file]{position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;}
+
 .gps-status{font-size:11.5px; color:var(--text-dim); margin-top:6px; display:flex; align-items:center; gap:5px;}
 .gps-status.ok{color:var(--green);}
 .gps-status .dot{width:7px; height:7px; border-radius:50%; background:var(--text-dim); flex-shrink:0;}
@@ -273,6 +285,13 @@ nav.bottomnav button.active{color:var(--amber);}
 
 <div id="toast"></div>
 
+<div class="modal-bg" id="photoModal" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="modal-box">
+    <h3>Foto</h3>
+    <img id="photoModalImg" src="">
+  </div>
+</div>
+
 <div class="modal-bg" id="agenteModal">
   <div class="modal-box">
     <h3>Ingresar operario</h3>
@@ -281,7 +300,6 @@ nav.bottomnav button.active{color:var(--amber);}
     <label class="flabel">Código de operario</label>
     <input type="text" inputmode="numeric" id="agenteCodeInput" placeholder="Ej: 703" onkeydown="if(event.key==='Enter') AgenteMod.loginByCode()">
     <button class="primary" style="width:100%; margin-top:10px" onclick="AgenteMod.loginByCode()">Ingresar</button>
-    <div class="agente-list" id="agenteList"></div>
     <div class="btnrow" style="margin-top:12px">
       <button class="secondary" onclick="AgenteMod.closeModal()">Cerrar</button>
     </div>
@@ -329,26 +347,6 @@ var AgenteMod = {
     box.innerHTML = current ?
       ('<div class="agente-current">Operando ahora: <b>'+escHtml(current.nombre)+'</b></div>') :
       ('<div class="agente-current">Todavía no ingresaste tu código</div>');
-
-    var admins = AGENTES.filter(function(a){ return a.tipo === 'Administrativo'; });
-    var lecturistas = AGENTES.filter(function(a){ return a.tipo === 'Lecturista'; });
-
-    function renderGroup(title, list){
-      var html = '<div class="agente-group">'+title+'</div>';
-      for (var i=0;i<list.length;i++){
-        var a = list[i];
-        var sel = (current && current.dni === a.dni) ? ' selected' : '';
-        html += '<div class="agente-item'+sel+'">' +
-          '<span class="a-name">'+escHtml(a.nombre)+'</span>' +
-          '<span class="a-cod">Cod. '+escHtml(a.cod)+'</span>' +
-        '</div>';
-      }
-      return html;
-    }
-
-    document.getElementById('agenteList').innerHTML =
-      '<div class="agente-group" style="margin-top:14px">Referencia de códigos</div>' +
-      renderGroup('Administrativos', admins) + renderGroup('Lecturistas', lecturistas);
   },
 
   loginByCode: function(){
@@ -732,8 +730,10 @@ var Detail = {
       lectura: saved.lectura || '',
       estado: saved.estado || '',
       obs: saved.obs || '',
+      fotoMedidor: saved.fotoMedidor || null,
       cambioMedidor: !!saved.cambioMedidor,
       medidorAnterior: saved.medidorAnterior || '',
+      fotoAnterior: saved.fotoAnterior || null,
       lat: saved.lat || null,
       lng: saved.lng || null,
       gpsAt: saved.gpsAt || null,
@@ -763,6 +763,8 @@ var Detail = {
       '<select id="fEstado">'+estadoOptions+'</select>' +
       '<label class="flabel">Observaciones</label>' +
       '<textarea id="fObs" placeholder="Notas adicionales...">'+escHtml(this.data.obs)+'</textarea>' +
+      '<label class="flabel">Foto del medidor</label>' +
+      '<div class="photo-row" id="photoRowMedidor"></div>' +
     '</fieldset>' +
 
     '<fieldset><legend>Cambio de medidor</legend>' +
@@ -773,6 +775,8 @@ var Detail = {
       '<div id="cambioBlock" class="'+(this.data.cambioMedidor?'':'hidden')+'">' +
         '<label class="flabel">N° de medidor anterior (retirado)</label>' +
         '<input type="text" id="fMedAnterior" placeholder="N° medidor retirado" value="'+escAttr(this.data.medidorAnterior)+'">' +
+        '<label class="flabel">Foto del medidor anterior</label>' +
+        '<div class="photo-row" id="photoRowAnterior"></div>' +
       '</div>' +
     '</fieldset>' +
 
@@ -792,6 +796,8 @@ var Detail = {
     '</div>';
 
     document.getElementById('screen-detail').innerHTML = html;
+    this.renderPhotos('photoRowMedidor', 'fotoMedidor');
+    this.renderPhotos('photoRowAnterior', 'fotoAnterior');
     this.updateGpsUI();
     this.captureGpsSilently();
   },
@@ -800,6 +806,45 @@ var Detail = {
     var chk = document.getElementById('fCambio').checked;
     this.data.cambioMedidor = chk;
     document.getElementById('cambioBlock').classList.toggle('hidden', !chk);
+  },
+
+  renderPhotos: function(containerId, field){
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var photo = this.data[field];
+    var html = '';
+    if (photo){
+      html += '<div class="photo-thumb" onclick="Detail.viewPhoto(\''+field+'\')">' +
+                '<img src="'+photo+'">' +
+                '<button class="rm" onclick="event.stopPropagation();Detail.removePhoto(\''+field+'\',\''+containerId+'\')">✕</button>' +
+              '</div>';
+    } else {
+      html += '<label class="photobtn">' +
+                '<span class="plus">＋</span>Foto' +
+                '<input type="file" accept="image/*" capture="environment" onchange="Detail.onPhotoSelected(event,\''+field+'\',\''+containerId+'\')">' +
+              '</label>';
+    }
+    el.innerHTML = html;
+  },
+
+  onPhotoSelected: function(ev, field, containerId){
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    var self = this;
+    compressImage(file, 1280, 0.72, function(dataUrl){
+      self.data[field] = dataUrl;
+      self.renderPhotos(containerId, field);
+    });
+  },
+  removePhoto: function(field, containerId){
+    this.data[field] = null;
+    this.renderPhotos(containerId, field);
+  },
+  viewPhoto: function(field){
+    var photo = this.data[field];
+    if (!photo) return;
+    document.getElementById('photoModalImg').src = photo;
+    document.getElementById('photoModal').classList.add('show');
   },
 
   updateGpsUI: function(){
@@ -858,8 +903,10 @@ var Detail = {
       lectura: lectura,
       estado: estado,
       obs: obs,
+      fotoMedidor: this.data.fotoMedidor,
       cambioMedidor: this.data.cambioMedidor,
       medidorAnterior: this.data.cambioMedidor ? medAnterior : '',
+      fotoAnterior: this.data.cambioMedidor ? this.data.fotoAnterior : null,
       lat: this.data.lat,
       lng: this.data.lng,
       gpsAt: this.data.gpsAt,
@@ -880,6 +927,27 @@ var Detail = {
   }
 };
 
+/* Redimensiona/comprime una imagen a dataURL JPEG para no saturar IndexedDB */
+function compressImage(file, maxSize, quality, cb){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var w = img.width, h = img.height;
+      if (w > h){ if (w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; } }
+      else { if (h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; } }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function(){ cb(e.target.result); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 /* ---------------- Export CSV / PDF ---------------- */
 var ExportMod = {
   buildRows: function(){
@@ -897,7 +965,9 @@ var ExportMod = {
         lat: r.lat != null ? r.lat : '', lng: r.lng != null ? r.lng : '',
         obs: r.obs || '', obsListado: u.obs || '',
         fecha: r.timestamp ? r.timestamp.replace('T',' ').substring(0,16) : '',
-        agente: r.agenteNombre || '', agenteCod: r.agenteCod || ''
+        agente: r.agenteNombre || '', agenteCod: r.agenteCod || '',
+        tieneFotoMedidor: r.fotoMedidor ? 'SI' : 'NO',
+        tieneFotoAnterior: r.fotoAnterior ? 'SI' : 'NO'
       });
     }
     return rows;
@@ -908,13 +978,13 @@ var ExportMod = {
     var headers = ['Zona','N° Medidor','Cliente','US','Instalación','Dirección','Tipo','UG',
       'Lectura','Estado','Cambio Medidor','Medidor Anterior','Latitud','Longitud',
       'Observación Lecturista','Observación Listado','Fecha/Hora',
-      'Agente','Cod. Agente'];
+      'Agente','Cod. Agente','Foto Medidor','Foto Anterior'];
     var lines = [headers.join(';')];
     for (var i=0;i<rows.length;i++){
       var r = rows[i];
       var vals = [r.zona,r.med,r.nom,r.us,r.inst,r.dir,r.tipo,r.ug,r.lectura,r.estado,
         r.cambioMedidor,r.medidorAnterior,r.lat,r.lng,r.obs,r.obsListado,r.fecha,
-        r.agente,r.agenteCod];
+        r.agente,r.agenteCod,r.tieneFotoMedidor,r.tieneFotoAnterior];
       lines.push(vals.map(csvEscape).join(';'));
     }
     var csv = '\uFEFF' + lines.join('\r\n');
