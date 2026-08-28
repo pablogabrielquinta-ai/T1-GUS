@@ -1,6 +1,6 @@
 {
-  "name": "DPEC · Lectura GU T1",
-  "short_name": "GU T1",
+  "name": "Relevamiento GU",
+  "short_name": "Relevamiento GU",
   "description": "Relevamiento offline de medidores T1 de Grandes Usuarios - DPEC",
   "start_url": "./index.html",
   "scope": "./",
