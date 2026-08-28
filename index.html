@@ -65,16 +65,27 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 
 /* ---- search / filters ---- */
 .searchbar{
-  display:flex; gap:14px; align-items:center;
-  background:var(--panel); border:1px solid var(--border); border-radius:18px;
-  padding:24px 20px; margin-bottom:12px;
+  display:flex; gap:16px; align-items:center;
+  background:#ffffff; border:2px solid #f0c479; border-radius:20px;
+  padding:26px 26px 26px 20px; margin-bottom:14px;
+  box-shadow:0 6px 20px rgba(232,163,61,0.28);
+  transition:box-shadow .15s, border-color .15s;
 }
-.searchbar span:first-child{font-size:26px;}
+.searchbar:focus-within{
+  border-color:var(--amber);
+  box-shadow:0 6px 24px rgba(232,163,61,0.45);
+}
+.search-ico{
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:54px; height:54px; border-radius:50%;
+  background:linear-gradient(135deg,#e8a33d,#d98a1f);
+  font-size:24px;
+}
 .searchbar input{
-  flex:1; background:none; border:none; outline:none; color:var(--text); font-size:20px;
+  flex:1; background:none; border:none; outline:none; color:#14201a; font-size:23px;
 }
-.searchbar input::placeholder{color:var(--text-dim);}
-.searchbar .clr{color:var(--text-dim); cursor:pointer; font-size:24px; padding:2px 8px;}
+.searchbar input::placeholder{color:#7a8a80;}
+.searchbar .clr{color:#5a6a62; cursor:pointer; font-size:27px; padding:2px 8px;}
 
 /* ---- summary strip ---- */
 .summary-strip{
@@ -255,8 +266,8 @@ nav.bottomnav button.active{color:var(--amber);}
   <!-- PANTALLA: INICIO (zonas) -->
   <section class="screen" id="screen-home">
     <div class="searchbar">
-      <span>🔍</span>
-      <input type="text" id="globalSearch" placeholder="Buscar por N° medidor, cliente, dirección, tipo...">
+      <span class="search-ico">🔍</span>
+      <input type="text" id="globalSearch" placeholder="¿Qué medidor buscás?">
       <span class="clr hidden" id="globalSearchClr" onclick="App.clearGlobalSearch()">✕</span>
     </div>
     <div id="globalResults" class="user-list hidden"></div>
@@ -271,8 +282,8 @@ nav.bottomnav button.active{color:var(--amber);}
   <!-- PANTALLA: LISTA DE ZONA -->
   <section class="screen" id="screen-zona">
     <div class="searchbar">
-      <span>🔍</span>
-      <input type="text" id="zonaSearch" placeholder="Buscar en esta zona...">
+      <span class="search-ico">🔍</span>
+      <input type="text" id="zonaSearch" placeholder="Buscá en esta zona...">
       <span class="clr hidden" id="zonaSearchClr" onclick="App.clearZonaSearch()">✕</span>
     </div>
     <div class="summary-strip" id="zonaSummaryStrip"></div>
