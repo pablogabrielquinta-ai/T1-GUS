@@ -4,31 +4,40 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>DPEC · Relevamiento GU</title>
-<meta name="theme-color" content="#0d1310">
+<meta name="theme-color" content="#eef1ee">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Relevamiento GU">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta name="msapplication-TileColor" content="#0d1310">
+<meta name="msapplication-TileColor" content="#eef1ee">
 <style>
 :root{
-  --bg:#0d1310;
-  --bg2:#121a16;
-  --panel:#161f1a;
-  --panel2:#1b251f;
-  --border:#26332b;
-  --text:#e9efe9;
-  --text-dim:#9db3a4;
+  --bg:#eef1ee;
+  --bg2:#f6f7f5;
+  --panel:#ffffff;
+  --panel2:#eef1ee;
+  --border:#dde2dc;
+  --text:#1c2620;
+  --text-dim:#67746c;
   --amber:#e8a33d;
-  --amber-dim:#8a6423;
-  --green:#4caf7d;
-  --green-dim:#2c5c42;
-  --red:#e0555a;
-  --blue:#4a90c4;
+  --amber-dim:#f0c479;
+  --amber-tint:#fdf1dd;
+  --green:#2f9e5b;
+  --green-dim:#9fd9b6;
+  --green-tint:#e6f6ec;
+  --orange:#e07b2a;
+  --orange-dim:#f3c393;
+  --orange-tint:#fdf0e2;
+  --red:#d9433f;
+  --red-dim:#f0a8a5;
+  --red-tint:#fbe9e8;
+  --blue:#2f7fc4;
+  --blue-dim:#a9cdea;
+  --blue-tint:#e8f2fb;
   --radius:12px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -44,9 +53,10 @@ body{
 /* ---- header ---- */
 header.topbar{
   position:sticky; top:0; z-index:20;
-  background:linear-gradient(180deg,#141c17,#0f1613);
+  background:#ffffff;
   border-bottom:1px solid var(--border);
   padding:10px 14px; display:flex; align-items:center; gap:10px;
+  box-shadow:0 1px 3px rgba(28,38,32,0.05);
 }
 header.topbar .brand{display:flex; flex-direction:column; flex:1; min-width:0;}
 header.topbar .brand b{color:var(--amber); font-size:15px; letter-spacing:.3px;}
@@ -70,14 +80,14 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 /* ---- search / filters ---- */
 .searchbar{
   display:flex; gap:14px; align-items:center;
-  background:#ffffff; border:2px solid #f0c479; border-radius:20px;
+  background:#ffffff; border:2px solid var(--amber-dim); border-radius:20px;
   padding:20px 22px; margin-bottom:14px;
-  box-shadow:0 6px 18px rgba(232,163,61,0.25);
+  box-shadow:0 4px 14px rgba(232,163,61,0.18);
   transition:box-shadow .15s, border-color .15s;
 }
 .searchbar:focus-within{
   border-color:var(--amber);
-  box-shadow:0 6px 22px rgba(232,163,61,0.4);
+  box-shadow:0 4px 18px rgba(232,163,61,0.3);
 }
 .search-ico{
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
@@ -86,10 +96,10 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
   font-size:21px;
 }
 .searchbar input{
-  flex:1; background:none; border:none; outline:none; color:#14201a; font-size:19px; min-width:0;
+  flex:1; background:none; border:none; outline:none; color:var(--text); font-size:19px; min-width:0;
 }
-.searchbar input::placeholder{color:#7a8a80; font-size:19px;}
-.searchbar .clr{color:#5a6a62; cursor:pointer; font-size:23px; padding:2px 8px;}
+.searchbar input::placeholder{color:var(--text-dim); font-size:19px;}
+.searchbar .clr{color:var(--text-dim); cursor:pointer; font-size:23px; padding:2px 8px;}
 
 /* ---- summary strip ---- */
 .summary-strip{
@@ -99,15 +109,25 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
   flex-shrink:0; background:var(--panel); border:1px solid var(--border); border-radius:10px;
   padding:8px 12px; text-align:center; min-width:74px;
 }
-.summary-chip b{display:block; font-size:18px; color:var(--amber);}
+.summary-chip b{display:block; font-size:18px; color:var(--text);}
 .summary-chip span{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px;}
 .summary-chip.done b{color:var(--green);}
+.summary-chip.novedad b{color:var(--orange);}
+
+/* ---- filtro pendientes/relevados ---- */
+.filter-row{display:flex; gap:8px; margin-bottom:10px; overflow-x:auto; padding-bottom:2px;}
+.filter-chip{
+  flex-shrink:0; background:var(--panel); border:1px solid var(--border); color:var(--text-dim);
+  border-radius:20px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer;
+}
+.filter-chip.active{background:var(--amber); color:#1a1206; border-color:var(--amber);}
 
 /* ---- zona cards ---- */
 .zona-list{display:flex; flex-direction:column; gap:8px;}
 .zona-card{
   background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
   padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer;
+  box-shadow:0 1px 3px rgba(28,38,32,0.04);
 }
 .zona-card:active{background:var(--panel2);}
 .zona-card .zinfo{flex:1; min-width:0;}
@@ -122,33 +142,34 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 .user-card{
   background:var(--panel); border:1px solid var(--border); border-left:4px solid var(--border);
   border-radius:10px; padding:10px 12px; cursor:pointer;
+  box-shadow:0 1px 3px rgba(28,38,32,0.04);
 }
 .user-card:active{background:var(--panel2);}
 .user-card.st-leido{border-left-color:var(--green);}
-.user-card.st-parcial{border-left-color:var(--amber);}
+.user-card.st-parcial{border-left-color:var(--orange);}
 .user-card.st-problema{border-left-color:var(--red);}
 .user-card .u-top{display:flex; justify-content:space-between; gap:8px; align-items:flex-start;}
 .user-card .u-nom{font-weight:600; font-size:15.5px; flex:1; min-width:0;}
 .user-card .u-med{font-size:13.5px; color:var(--amber); font-weight:600; white-space:nowrap;}
 .user-card .u-lapiz{font-size:14px; white-space:nowrap;}
-.tag.tag-cambio{color:var(--amber); border-color:var(--amber-dim);}
+.tag.tag-cambio{color:var(--amber); border-color:var(--amber-dim); background:var(--amber-tint);}
 .user-card .u-dir{font-size:13px; color:var(--text-dim); margin-top:2px;}
 .user-card .u-tags{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
 .tag{font-size:11.5px; padding:2px 7px; border-radius:20px; background:var(--panel2); color:var(--text-dim); border:1px solid var(--border);}
 .tag.st{font-weight:600;}
-.tag.st-leido{color:var(--green); border-color:var(--green-dim);}
-.tag.st-parcial{color:var(--amber); border-color:var(--amber-dim);}
-.tag.st-problema{color:var(--red); border-color:#5c2a2c;}
+.tag.st-leido{color:var(--green); border-color:var(--green-dim); background:var(--green-tint);}
+.tag.st-parcial{color:var(--orange); border-color:var(--orange-dim); background:var(--orange-tint);}
+.tag.st-problema{color:var(--red); border-color:var(--red-dim); background:var(--red-tint);}
 .tag.st-pendiente{color:var(--text-dim);}
 
 /* ---- detail form ---- */
-.detail-head{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:12px;}
+.detail-head{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:12px; box-shadow:0 1px 3px rgba(28,38,32,0.04);}
 .detail-head h2{margin:0 0 6px; font-size:18.5px; color:var(--text);}
 .detail-head .dh-row{font-size:13.5px; color:var(--text-dim); margin-top:3px;}
 .detail-head .dh-row b{color:var(--text);}
 .detail-head .dh-badges{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
 
-fieldset{border:1px solid var(--border); border-radius:var(--radius); padding:12px; margin:0 0 12px; background:var(--panel);}
+fieldset{border:1px solid var(--border); border-radius:var(--radius); padding:12px; margin:0 0 12px; background:var(--panel); box-shadow:0 1px 3px rgba(28,38,32,0.04);}
 fieldset legend{padding:0 6px; color:var(--amber); font-size:12.5px; font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
 label.flabel{display:block; font-size:13.5px; color:var(--text-dim); margin:8px 0 5px;}
 label.flabel:first-child{margin-top:0;}
@@ -156,33 +177,39 @@ input[type=text], input[type=number], select, textarea{
   width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text);
   border-radius:9px; padding:11px 12px; font-size:16.5px; outline:none;
 }
-select{appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%239db3a4' stroke-width='2' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px;}
+select{appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%2367746c' stroke-width='2' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px;}
 textarea{resize:vertical; min-height:56px;}
 .chk-row{display:flex; align-items:center; gap:9px; margin-top:10px;}
 .chk-row input[type=checkbox]{width:21px; height:21px; accent-color:var(--amber);}
 .chk-row label{font-size:14.5px; color:var(--text);}
 
 .gps-status{font-size:12.5px; color:var(--text-dim); margin-top:6px; display:flex; align-items:center; gap:5px;}
-.gps-status.ok{color:var(--green);}
+.gps-status.ok{color:var(--blue);}
 .gps-status .dot{width:7px; height:7px; border-radius:50%; background:var(--text-dim); flex-shrink:0;}
-.gps-status.ok .dot{background:var(--green);}
+.gps-status.ok .dot{background:var(--blue);}
 
 .btnrow{display:flex; gap:10px; margin-top:4px;}
+.nav-adjacent{display:flex; gap:10px; margin-bottom:10px;}
+.nav-adjacent button{flex:1; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-size:13.5px; cursor:pointer;}
+.nav-adjacent button:active{background:var(--border);}
 button.primary, button.secondary, button.danger{
   flex:1; padding:14px; border-radius:11px; border:none; font-size:16px; font-weight:600; cursor:pointer;
 }
 button.primary{background:var(--amber); color:#1a1206;}
 button.primary:active{background:#cf8f30;}
 button.secondary{background:var(--panel2); color:var(--text); border:1px solid var(--border);}
-button.danger{background:#3a1e1f; color:var(--red); border:1px solid #5c2a2c;}
+button.secondary:active{background:var(--border);}
+button.danger{background:var(--red-tint); color:var(--red); border:1px solid var(--red-dim);}
+button.danger:active{background:var(--red-dim);}
 
 /* ---- estado colors mapped inline via classes above ---- */
 
 /* ---- bottom nav ---- */
 nav.bottomnav{
   position:fixed; bottom:0; left:0; right:0; z-index:30;
-  background:#0f1613; border-top:1px solid var(--border);
+  background:#ffffff; border-top:1px solid var(--border);
   display:flex; max-width:720px; margin:0 auto; padding:6px 4px env(safe-area-inset-bottom);
+  box-shadow:0 -1px 3px rgba(28,38,32,0.05);
 }
 nav.bottomnav button{
   flex:1; background:none; border:none; color:var(--text-dim); font-size:10.5px; padding:7px 2px 5px;
@@ -194,17 +221,40 @@ nav.bottomnav button.active{color:var(--amber);}
 /* ---- toast ---- */
 #toast{
   position:fixed; left:50%; bottom:74px; transform:translateX(-50%) translateY(20px);
-  background:#1c2a20; color:var(--text); border:1px solid var(--green-dim); padding:10px 16px; border-radius:10px;
+  background:#2b332e; color:#fff; border:1px solid #3d453f; padding:10px 16px; border-radius:10px;
   font-size:13.5px; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:50; max-width:88%; text-align:center;
 }
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
 /* ---- modal (photo viewer / confirm) ---- */
-.modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:60; display:none; align-items:center; justify-content:center; padding:20px;}
+.modal-bg{position:fixed; inset:0; background:rgba(20,26,22,.55); z-index:60; display:none; align-items:center; justify-content:center; padding:20px;}
 .modal-bg.show{display:flex;}
-.modal-box{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; max-width:420px; width:100%; max-height:86vh; overflow:auto;}
+.modal-box{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; max-width:420px; width:100%; max-height:86vh; overflow:auto; box-shadow:0 8px 30px rgba(28,38,32,0.2);}
 .modal-box h3{margin:0 0 10px; font-size:16px; color:var(--amber);}
 .modal-box img{width:100%; border-radius:9px;}
+
+/* ---- cámara en vivo (pantalla completa, sin el padding del modal genérico) ---- */
+#cameraModal{background:#000; padding:0; z-index:80;}
+.camera-wrap{width:100%; height:100%; display:flex; flex-direction:column;}
+#cameraVideo{flex:1; width:100%; height:100%; object-fit:cover; background:#000;}
+.camera-controls{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 24px calc(18px + env(safe-area-inset-bottom));
+  background:#000;
+}
+.camera-shutter{
+  width:68px; height:68px; border-radius:50%; background:#fff; border:4px solid var(--amber);
+  font-size:26px; cursor:pointer; flex-shrink:0;
+}
+.camera-cancel{background:none; border:none; color:#fff; font-size:15px; padding:10px; cursor:pointer;}
+.camera-spacer{width:70px; flex-shrink:0;}
+.camera-error{color:#fff; text-align:center; padding:40px 24px; font-size:14px;}
+
+/* ---- foto del medidor ---- */
+.foto-thumb-wrap{position:relative; width:120px; height:120px; border-radius:11px; overflow:hidden; border:1px solid var(--border);}
+.foto-thumb-wrap img{width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;}
+.foto-actions{display:flex; gap:10px; margin-top:10px;}
+.foto-actions button{flex:1;}
 
 /* ---- empty state ---- */
 .empty{text-align:center; color:var(--text-dim); padding:40px 20px; font-size:13.5px;}
@@ -218,7 +268,7 @@ nav.bottomnav button.active{color:var(--amber);}
   background:var(--bg2); border:1px solid var(--border); border-radius:9px; padding:10px 12px; cursor:pointer;
 }
 .agente-item:active{background:var(--panel2);}
-.agente-item.selected{border-color:var(--amber); background:#241c0d;}
+.agente-item.selected{border-color:var(--amber); background:var(--amber-tint);}
 .agente-item .a-name{font-size:14px;}
 .agente-item .a-cod{font-size:11.5px; color:var(--text-dim);}
 .agente-current{
@@ -235,7 +285,7 @@ nav.bottomnav button.active{color:var(--amber);}
   border:2px dashed var(--border); border-radius:11px; background:var(--bg2); color:var(--text);
 }
 .ord-box:active{border-color:var(--amber);}
-.ord-box.filled{border:2px solid var(--amber-dim); background:#20180a; color:var(--amber);}
+.ord-box.filled{border:2px solid var(--amber-dim); background:var(--amber-tint); color:var(--amber);}
 .ord-manual-row{display:flex; gap:10px; align-items:stretch;}
 .ord-manual-row input{
   width:100px; flex:none; text-align:center; font-size:19px; font-weight:700;
@@ -243,7 +293,7 @@ nav.bottomnav button.active{color:var(--amber);}
 .ord-preview{display:flex; flex-direction:row; flex-wrap:wrap; gap:8px; margin-top:10px;}
 .ord-preview-item{
   font-size:12px; color:var(--text-dim); white-space:nowrap;
-  background:var(--panel2); border:1px solid var(--amber-dim); border-radius:20px; padding:6px 11px;
+  background:var(--amber-tint); border:1px solid var(--amber-dim); border-radius:20px; padding:6px 11px;
 }
 .ord-preview-item b{color:var(--amber);}
 .ord-list{max-height:52vh; overflow:auto; display:flex; flex-direction:column; gap:6px; margin-top:10px;}
@@ -252,7 +302,7 @@ nav.bottomnav button.active{color:var(--amber);}
   display:flex; justify-content:space-between; align-items:center; gap:8px;
 }
 .ord-item:active{background:var(--panel2);}
-.ord-item.selected{border-color:var(--amber); background:#241c0d;}
+.ord-item.selected{border-color:var(--amber); background:var(--amber-tint);}
 .ord-item .o-cod{color:var(--amber); font-weight:700; min-width:26px; flex-shrink:0;}
 .ord-item .o-desc{flex:1; font-size:12.5px;}
 .ord-item .o-check{color:var(--green); flex-shrink:0;}
@@ -304,6 +354,7 @@ nav.bottomnav button.active{color:var(--amber);}
       <span class="clr hidden" id="zonaSearchClr" onclick="App.clearZonaSearch()">✕</span>
     </div>
     <div class="summary-strip" id="zonaSummaryStrip"></div>
+    <div class="filter-row" id="zonaFilterRow"></div>
     <div class="user-list" id="zonaUserList"></div>
   </section>
 
@@ -321,6 +372,36 @@ nav.bottomnav button.active{color:var(--amber);}
 </div>
 
 <div id="toast"></div>
+
+<div class="modal-bg" id="cameraModal">
+  <div class="camera-wrap">
+    <video id="cameraVideo" autoplay playsinline muted></video>
+    <div class="camera-controls">
+      <button class="camera-cancel" onclick="CameraMod.cancel()">Cancelar</button>
+      <button class="camera-shutter" onclick="CameraMod.capture()">📷</button>
+      <span class="camera-spacer"></span>
+    </div>
+  </div>
+</div>
+<canvas id="cameraCanvas" style="display:none"></canvas>
+
+<div class="modal-bg" id="fotoViewModal" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="modal-box">
+    <h3>Foto del medidor</h3>
+    <img id="fotoViewImg" src="">
+  </div>
+</div>
+
+<div class="modal-bg" id="clearConfirmModal">
+  <div class="modal-box">
+    <h3 id="clearConfirmTitle">Exportado ✅</h3>
+    <p class="dh-row" style="margin:0 0 16px">¿Querés borrar los datos guardados en este dispositivo, o preferís conservarlos para seguir cargando o volver a exportar?</p>
+    <div class="btnrow">
+      <button class="secondary" onclick="ExportMod.keepData()">Conservar datos</button>
+      <button class="danger" onclick="ExportMod.confirmClearNow()">Borrar</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-bg" id="agenteModal">
   <div class="modal-box">
@@ -430,6 +511,67 @@ var AgenteMod = {
     this.set(found);
     toast('Operando: ' + found.nombre);
     this.closeModal();
+  }
+};
+
+var CameraMod = {
+  stream: null,
+
+  open: function(){
+    var video = document.getElementById('cameraVideo');
+    document.getElementById('cameraModal').classList.add('show');
+    App.pushNavState();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      toast('Este celular no permite usar la cámara acá adentro');
+      this.cancel();
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
+      video: {facingMode: {ideal: 'environment'}},
+      audio: false
+    }).then(function(stream){
+      CameraMod.stream = stream;
+      video.srcObject = stream;
+    })['catch'](function(err){
+      toast('No se pudo abrir la cámara. Revisá los permisos del navegador.');
+      CameraMod.cancel();
+    });
+  },
+
+  stopStream: function(){
+    if (this.stream){
+      var tracks = this.stream.getTracks();
+      for (var i=0;i<tracks.length;i++){ tracks[i].stop(); }
+      this.stream = null;
+    }
+  },
+
+  cancel: function(){
+    this.stopStream();
+    document.getElementById('cameraModal').classList.remove('show');
+  },
+
+  capture: function(){
+    var video = document.getElementById('cameraVideo');
+    if (!video.videoWidth){
+      toast('Esperá un segundo a que cargue la cámara');
+      return;
+    }
+    var canvas = document.getElementById('cameraCanvas');
+    var maxSize = 1280;
+    var w = video.videoWidth, h = video.videoHeight;
+    var scale = Math.min(1, maxSize / Math.max(w, h));
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+    this.stopStream();
+    document.getElementById('cameraModal').classList.remove('show');
+    Detail.data.fotoMedidor = dataUrl;
+    Detail.renderFoto();
+    toast('Foto lista ✓');
   }
 };
 
@@ -545,6 +687,21 @@ function derivedStatus(r){
   return {cls:'st-pendiente', label:'Pendiente'};
 }
 
+/* Ordenativos que indican "no se pudo acceder / no se encontró el medidor".
+   Si además se cargó una lectura, es contradictorio y conviene avisar. */
+var CODIGOS_SIN_ACCESO = ['1','4','5','6','7','9'];
+
+/* Detecta lecturas que suelen ser un error de tipeo (no bloquea, solo avisa). */
+function lecturaSospechosa(lectura){
+  if (!lectura) return null;
+  var soloDigitos = /^[0-9]+$/.test(lectura);
+  if (soloDigitos){
+    if (lectura.length < 3) return 'La lectura "'+lectura+'" es muy corta.';
+    if (/^(\d)\1+$/.test(lectura)) return 'La lectura "'+lectura+'" tiene todos los dígitos iguales.';
+  }
+  return null;
+}
+
 /* ---------------- IndexedDB ---------------- */
 var DB_NAME = 'GU_T1_DB';
 var DB_VERSION = 1;
@@ -624,6 +781,7 @@ var App = {
   stack: ['home'],
   currentZona: null,
   currentMed: null,
+  zonaFilter: 'todos',
 
   init: function(){
     refreshCache(function(){
@@ -705,8 +863,26 @@ var App = {
      (o cuando back() delega en el navegador). Si hay un modal abierto,
      lo cierra primero; si no, desapila la pantalla anterior. */
   handleHardwareBack: function(){
+    var camModal = document.getElementById('cameraModal');
+    var fotoViewModal = document.getElementById('fotoViewModal');
     var ordModal = document.getElementById('ordenativoModal');
     var agModal = document.getElementById('agenteModal');
+    if (camModal && camModal.classList.contains('show')){
+      CameraMod.cancel();
+      this.pushNavState();
+      return;
+    }
+    if (fotoViewModal && fotoViewModal.classList.contains('show')){
+      fotoViewModal.classList.remove('show');
+      this.pushNavState();
+      return;
+    }
+    var clearModal = document.getElementById('clearConfirmModal');
+    if (clearModal && clearModal.classList.contains('show')){
+      ExportMod.keepData();
+      this.pushNavState();
+      return;
+    }
     if (ordModal && ordModal.classList.contains('show')){
       OrdMod.closeModal();
       this.pushNavState();
@@ -749,7 +925,11 @@ var App = {
 
   showSyncInfo: function(){
     var total = USERS.length, done = 0;
-    for (var k in LECTURAS){ if (LECTURAS.hasOwnProperty(k) && LECTURAS[k].estado) done++; }
+    for (var k in LECTURAS){
+      if (!LECTURAS.hasOwnProperty(k)) continue;
+      var r = LECTURAS[k];
+      if ((r.lectura) || (r.ordenativos && r.ordenativos.length)) done++;
+    }
     toast(done + ' de ' + total + ' relevados · datos guardados solo en este dispositivo');
   },
 
@@ -769,7 +949,7 @@ var App = {
     strip.innerHTML =
       '<div class="summary-chip done"><b>'+done+'</b><span>Relevados</span></div>' +
       '<div class="summary-chip"><b>'+(total-done)+'</b><span>Pendientes</span></div>' +
-      '<div class="summary-chip"><b>'+conNovedad+'</b><span>Con novedad</span></div>' +
+      '<div class="summary-chip novedad"><b>'+conNovedad+'</b><span>Con novedad</span></div>' +
       '<div class="summary-chip"><b>'+total+'</b><span>Total GU</span></div>';
 
     var counts = {};
@@ -829,7 +1009,11 @@ var App = {
   /* ---- ZONA ---- */
   openZona: function(zona, isBack){
     this.currentZona = zona;
-    if (!isBack){ this.pushNavState(); this.stack.push('zona'); }
+    if (!isBack){
+      this.pushNavState();
+      this.stack.push('zona');
+      this.zonaFilter = 'todos';
+    }
     document.getElementById('hdrTitle').textContent = zona;
     document.getElementById('hdrSub').textContent = 'Relevamiento GU · Grandes Usuarios';
     document.getElementById('zonaSearch').value = '';
@@ -852,7 +1036,9 @@ var App = {
     document.getElementById('zonaSummaryStrip').innerHTML =
       '<div class="summary-chip done"><b>'+done+'</b><span>Relevados</span></div>' +
       '<div class="summary-chip"><b>'+(total-done)+'</b><span>Pendientes</span></div>' +
-      '<div class="summary-chip"><b>'+novedad+'</b><span>Novedades</span></div>';
+      '<div class="summary-chip novedad"><b>'+novedad+'</b><span>Novedades</span></div>';
+
+    this.renderZonaFilterRow(total, done, novedad);
 
     if (q){
       var ql = q.toLowerCase();
@@ -864,8 +1050,45 @@ var App = {
                u.tipo.toLowerCase().indexOf(ql)>=0;
       });
     }
+
+    var filtro = this.zonaFilter || 'todos';
+    if (filtro !== 'todos'){
+      list = list.filter(function(u){
+        var r = LECTURAS[u.med];
+        var hasLectura = !!(r && r.lectura);
+        var hasOrd = !!(r && r.ordenativos && r.ordenativos.length);
+        if (filtro === 'pendientes') return !hasLectura && !hasOrd;
+        if (filtro === 'relevados') return hasLectura || hasOrd;
+        if (filtro === 'novedad') return hasOrd;
+        return true;
+      });
+    }
+
     document.getElementById('zonaUserList').innerHTML = list.length ? list.map(renderUserCard).join('') :
       '<div class="empty">Sin resultados</div>';
+  },
+
+  renderZonaFilterRow: function(total, done, novedad){
+    var el = document.getElementById('zonaFilterRow');
+    if (!el) return;
+    var filtro = this.zonaFilter || 'todos';
+    var opts = [
+      {v:'todos', label:'Todos'},
+      {v:'pendientes', label:'Pendientes'},
+      {v:'relevados', label:'Relevados'},
+      {v:'novedad', label:'Con novedad'}
+    ];
+    var html = '';
+    for (var i=0;i<opts.length;i++){
+      var o = opts[i];
+      html += '<button class="filter-chip'+(filtro===o.v?' active':'')+'" onclick="App.setZonaFilter(\''+o.v+'\')">'+o.label+'</button>';
+    }
+    el.innerHTML = html;
+  },
+
+  setZonaFilter: function(v){
+    this.zonaFilter = v;
+    this.renderZonaList(document.getElementById('zonaSearch').value.trim());
   },
 
   onZonaSearch: function(){
@@ -889,14 +1112,24 @@ var App = {
     this.showScreen('detail');
   },
 
+  /* Lista de N° de medidor de una zona, en el mismo orden que se muestran
+     en pantalla — usada para "Anterior/Siguiente" y "Guardar y siguiente". */
+  getZonaMedList: function(zona){
+    return USERS.filter(function(u){ return u.zona === zona; }).map(function(u){ return u.med; });
+  },
+
   renderExport: function(){
     var total = USERS.length, done = 0;
-    for (var k in LECTURAS){ if (LECTURAS.hasOwnProperty(k) && LECTURAS[k].estado) done++; }
+    for (var k in LECTURAS){
+      if (!LECTURAS.hasOwnProperty(k)) continue;
+      var r = LECTURAS[k];
+      if ((r.lectura) || (r.ordenativos && r.ordenativos.length)) done++;
+    }
     var html =
       '<div class="detail-head">' +
         '<h2>Exportar relevamiento</h2>' +
         '<div class="dh-row"><b>'+done+'</b> de <b>'+total+'</b> medidores cargados</div>' +
-        '<div class="dh-row">Los datos quedan guardados en este dispositivo (offline). Exportá seguido para respaldar, tomaste todos los medidores o no.</div>' +
+        '<div class="dh-row">Los datos quedan guardados en este dispositivo (offline) hasta que decidas borrarlos. Después de exportar, la app te pregunta si querés conservarlos o borrarlos.</div>' +
       '</div>' +
       '<fieldset><legend>Enviar ahora (sin cable)</legend>' +
         '<p class="dh-row" style="margin-top:0">Abre el menú para compartir de Android: WhatsApp, correo, Bluetooth o "Compartir cerca / Nearby Share" con otro celular o PC.</p>' +
@@ -961,6 +1194,7 @@ var Detail = {
       med: med,
       lectura: saved.lectura || '',
       ordenativos: padOrdenativos(saved.ordenativos),
+      fotoMedidor: saved.fotoMedidor || null,
       obs: saved.obs || '',
       cambioMedidor: !!saved.cambioMedidor,
       medidorAnterior: saved.medidorAnterior || '',
@@ -991,6 +1225,10 @@ var Detail = {
       '<textarea id="fObs" placeholder="Notas adicionales...">'+escHtml(this.data.obs)+'</textarea>' +
     '</fieldset>' +
 
+    '<fieldset><legend>Foto del medidor</legend>' +
+      '<div id="fotoBox"></div>' +
+    '</fieldset>' +
+
     '<fieldset><legend>Novedades (ordenativos)</legend>' +
       '<div class="ord-boxes" id="ordBoxes"></div>' +
       '<div class="ord-preview" id="ordPreview"></div>' +
@@ -1007,15 +1245,54 @@ var Detail = {
       '</div>' +
     '</fieldset>' +
 
+    '<div class="nav-adjacent">' +
+      '<button class="secondary" onclick="Detail.goAdjacent(-1)">‹ Anterior</button>' +
+      '<button class="secondary" onclick="Detail.goAdjacent(1)">Siguiente ›</button>' +
+    '</div>' +
     '<div class="btnrow">' +
       '<button class="secondary" onclick="App.back()">Cancelar</button>' +
-      '<button class="primary" onclick="Detail.save()">💾 Guardar</button>' +
+      '<button class="primary" onclick="Detail.saveAndNext()">💾 Guardar y siguiente</button>' +
     '</div>';
 
     document.getElementById('screen-detail').innerHTML = html;
     this.renderOrdenativos();
+    this.renderFoto();
     this.updateGpsUI();
     this.captureGpsSilently();
+  },
+
+  renderFoto: function(){
+    var el = document.getElementById('fotoBox');
+    if (!el) return;
+    var foto = this.data.fotoMedidor;
+    if (foto){
+      el.innerHTML =
+        '<div class="foto-thumb-wrap"><img src="'+foto+'" onclick="Detail.viewFoto()"></div>' +
+        '<div class="foto-actions">' +
+          '<button class="secondary" onclick="CameraMod.open()">🔄 Repetir foto</button>' +
+        '</div>';
+    } else {
+      el.innerHTML = '<button class="primary" style="width:100%" onclick="CameraMod.open()">📷 Sacar foto</button>';
+    }
+  },
+
+  viewFoto: function(){
+    var foto = this.data.fotoMedidor;
+    if (!foto) return;
+    document.getElementById('fotoViewImg').src = foto;
+    document.getElementById('fotoViewModal').classList.add('show');
+  },
+
+  goAdjacent: function(dir){
+    var zona = App.currentZona;
+    if (!zona){ toast('Abrí este medidor desde una zona para poder navegar'); return; }
+    var list = App.getZonaMedList(zona);
+    var idx = list.indexOf(this.med);
+    if (idx === -1){ toast('No se pudo ubicar en la lista de la zona'); return; }
+    var newIdx = idx + dir;
+    if (newIdx < 0){ toast('Es el primer medidor de la zona'); return; }
+    if (newIdx >= list.length){ toast('Es el último medidor de la zona'); return; }
+    App.openDetail(list[newIdx]);
   },
 
   toggleCambio: function(){
@@ -1084,7 +1361,7 @@ var Detail = {
     }, {enableHighAccuracy:true, timeout:12000, maximumAge:60000});
   },
 
-  save: function(){
+  doSave: function(cb){
     var lectura = document.getElementById('fLectura').value.trim();
     var obs = document.getElementById('fObs').value.trim();
     var medAnterior = document.getElementById('fMedAnterior') ? document.getElementById('fMedAnterior').value.trim() : '';
@@ -1092,23 +1369,41 @@ var Detail = {
 
     if (!lectura && ordenativos.length===0){
       toast('Ingresá una lectura o al menos un ordenativo');
+      if (cb) cb(false);
       return;
     }
     if (this.data.cambioMedidor && !medAnterior){
       toast('Ingresá el N° de medidor anterior');
+      if (cb) cb(false);
       return;
     }
     var agente = AgenteMod.get();
     if (!agente){
       toast('Ingresá tu código de operario antes de guardar');
       AgenteMod.openModal();
+      if (cb) cb(false);
       return;
+    }
+
+    /* Validaciones blandas: piden confirmar, no bloquean el guardado. */
+    var sospecha = lecturaSospechosa(lectura);
+    if (sospecha && !confirm(sospecha + ' ¿Guardar igual?')){
+      if (cb) cb(false);
+      return;
+    }
+    var hayConflictoAcceso = ordenativos.some(function(c){ return CODIGOS_SIN_ACCESO.indexOf(c) >= 0; });
+    if (lectura && hayConflictoAcceso){
+      if (!confirm('Cargaste una lectura y también un ordenativo de "sin acceso / no se encontró el medidor". ¿Confirmás igual?')){
+        if (cb) cb(false);
+        return;
+      }
     }
 
     var record = {
       med: this.med,
       lectura: lectura,
       ordenativos: ordenativos,
+      fotoMedidor: this.data.fotoMedidor,
       obs: obs,
       cambioMedidor: this.data.cambioMedidor,
       medidorAnterior: this.data.cambioMedidor ? medAnterior : '',
@@ -1123,11 +1418,42 @@ var Detail = {
     dbPut(record, function(ok){
       if (ok){
         LECTURAS[record.med] = record;
-        toast('Guardado ✓');
-        App.back();
+        if (cb) cb(true);
       } else {
         toast('Error al guardar. Reintentá.');
+        if (cb) cb(false);
       }
+    });
+  },
+
+  save: function(){
+    this.doSave(function(ok){
+      if (ok){
+        toast('Guardado ✓');
+        App.back();
+      }
+    });
+  },
+
+  saveAndNext: function(){
+    var self = this;
+    this.doSave(function(ok){
+      if (!ok) return;
+      var zona = App.currentZona;
+      if (!zona){
+        toast('Guardado ✓');
+        App.back();
+        return;
+      }
+      var list = App.getZonaMedList(zona);
+      var idx = list.indexOf(self.med);
+      if (idx === -1 || idx === list.length-1){
+        toast('Guardado ✓ — era el último medidor de esta zona');
+        App.back();
+        return;
+      }
+      toast('Guardado ✓ — siguiente medidor');
+      App.openDetail(list[idx+1]);
     });
   }
 };
@@ -1153,7 +1479,8 @@ var ExportMod = {
         lat: r.lat != null ? r.lat : '', lng: r.lng != null ? r.lng : '',
         obs: r.obs || '', obsListado: u.obs || '',
         fecha: r.timestamp ? r.timestamp.replace('T',' ').substring(0,16) : '',
-        agente: r.agenteNombre || '', agenteCod: r.agenteCod || ''
+        agente: r.agenteNombre || '', agenteCod: r.agenteCod || '',
+        tieneFoto: r.fotoMedidor ? 'SI' : 'NO'
       });
     }
     return rows;
@@ -1164,14 +1491,14 @@ var ExportMod = {
     var headers = ['Zona','N° Medidor','Cliente','US','Instalación','Dirección','Tipo','UG',
       'Lectura','Estado','Ordenativos (códigos)','Ordenativos (detalle)','Cambio Medidor','Medidor Anterior','Latitud','Longitud',
       'Observación Lecturista','Observación Listado','Fecha/Hora',
-      'Agente','Cod. Agente'];
+      'Agente','Cod. Agente','Foto'];
     var lines = [headers.join(';')];
     for (var i=0;i<rows.length;i++){
       var r = rows[i];
       var vals = [r.zona,r.med,r.nom,r.us,r.inst,r.dir,r.tipo,r.ug,r.lectura,r.estado,
         r.ordenativos,r.ordenativosDetalle,
         r.cambioMedidor,r.medidorAnterior,r.lat,r.lng,r.obs,r.obsListado,r.fecha,
-        r.agente,r.agenteCod];
+        r.agente,r.agenteCod,r.tieneFoto];
       lines.push(vals.map(csvEscape).join(';'));
     }
     var csv = '\uFEFF' + lines.join('\r\n');
@@ -1182,7 +1509,7 @@ var ExportMod = {
     var blob = this.buildCSVBlob();
     var fecha = new Date().toISOString().substring(0,10);
     downloadBlob(blob, 'GU_T1_' + fecha + '.csv');
-    this.clearAfterExport('CSV descargado. Datos locales borrados ✓');
+    this.promptClearAfterExport('CSV descargado ✅');
   },
 
   shareCSV: function(){
@@ -1200,7 +1527,7 @@ var ExportMod = {
             title:'Relevamiento GU',
             text:'Relevamiento GU - ' + fecha
           }).then(function(){
-            self.clearAfterExport('Enviado. Datos locales borrados ✓');
+            self.promptClearAfterExport('Enviado ✅');
           })['catch'](function(err){
             if (err && err.name !== 'AbortError') toast('No se pudo enviar. Probá descargarlo.');
           });
@@ -1277,9 +1604,20 @@ var ExportMod = {
     });
   },
 
-  clearAfterExport: function(mensaje){
+  promptClearAfterExport: function(tituloMsg){
+    var t = document.getElementById('clearConfirmTitle');
+    if (t) t.textContent = tituloMsg;
+    document.getElementById('clearConfirmModal').classList.add('show');
+    App.pushNavState();
+  },
+  keepData: function(){
+    document.getElementById('clearConfirmModal').classList.remove('show');
+    toast('Datos conservados en el dispositivo');
+  },
+  confirmClearNow: function(){
+    document.getElementById('clearConfirmModal').classList.remove('show');
     clearAllLocalDataSilent(function(){
-      toast(mensaje);
+      toast('Datos locales borrados ✓');
       if (App.stack[App.stack.length-1]==='export') App.renderExport();
     });
   }
