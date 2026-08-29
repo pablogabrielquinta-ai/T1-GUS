@@ -14,6 +14,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
 <meta name="msapplication-TileColor" content="#eef1ee">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
   --bg:#eef1ee;
@@ -317,7 +319,8 @@ nav.bottomnav button.active{color:var(--amber);}
 .map-legend .dot-ok{background:var(--green);}
 .map-legend .dot-nov{background:var(--orange);}
 .map-legend .dot-prob{background:var(--red);}
-.map-svg{width:100%; height:auto; border-radius:12px; border:1px solid var(--border); background:var(--panel);}
+#mapLeafletWrap{border-radius:12px; overflow:hidden; border:1px solid var(--border);}
+#mapLeaflet{width:100%; height:60vh; min-height:340px; background:var(--panel);}
 
 /* ---- misc ---- */
 .section-title{font-size:12.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 8px;}
@@ -1811,6 +1814,7 @@ var BackupMod = {
 /* ---------------- Mapa del relevamiento ---------------- */
 var MapMod = {
   zonaFiltro: 'todas',
+  leafletMap: null,
 
   render: function(){
     var opciones = '<option value="todas">Todas las zonas</option>';
@@ -1822,6 +1826,7 @@ var MapMod = {
       '<div class="detail-head">' +
         '<h2>Mapa del relevamiento</h2>' +
         '<div class="dh-row">Ubicación capturada al abrir cada medidor. Solo aparecen los que ya tienen una lectura u ordenativo guardado.</div>' +
+        '<div class="dh-row">El mapa de calles se guarda en el celular a medida que lo vas viendo — abrí cada zona una vez con wifi para poder verla después sin conexión.</div>' +
       '</div>' +
       '<label class="flabel">Filtrar por zona</label>' +
       '<select id="mapZonaSelect" onchange="MapMod.onZonaChange()">'+opciones+'</select>' +
@@ -1830,21 +1835,28 @@ var MapMod = {
         '<span><span class="dot dot-nov"></span>Con novedad</span>' +
         '<span><span class="dot dot-prob"></span>Problema / s/lectura</span>' +
       '</div>' +
-      '<div id="mapSvgWrap"></div>';
+      '<div id="mapLeafletWrap"><div id="mapLeaflet"></div></div>' +
+      '<div class="dh-row" id="mapCountLabel" style="margin-top:8px; text-align:center"></div>';
     document.getElementById('screen-map').innerHTML = html;
-    this.renderSVG();
+    this.renderMap();
   },
 
   onZonaChange: function(){
     this.zonaFiltro = document.getElementById('mapZonaSelect').value;
-    this.renderSVG();
+    this.renderMap();
   },
 
-  renderSVG: function(){
-    var wrap = document.getElementById('mapSvgWrap');
+  renderMap: function(){
+    var wrap = document.getElementById('mapLeafletWrap');
+    var contador = document.getElementById('mapCountLabel');
     if (!wrap) return;
-    var zonaFiltro = this.zonaFiltro;
 
+    if (typeof L === 'undefined'){
+      wrap.innerHTML = '<div class="empty">No se pudo cargar el mapa de calles (hace falta internet la primera vez). El GPS de cada medidor se sigue guardando igual.</div>';
+      return;
+    }
+
+    var zonaFiltro = this.zonaFiltro;
     var puntos = [];
     for (var i=0;i<USERS.length;i++){
       var u = USERS[i];
@@ -1855,42 +1867,44 @@ var MapMod = {
       puntos.push({med:u.med, nom:u.nom, zona:u.zona, lat:r.lat, lng:r.lng, cls:st.cls, label:st.label});
     }
 
-    if (!puntos.length){
-      wrap.innerHTML = '<div class="empty">Todavía no hay medidores con ubicación guardada'+(zonaFiltro!=='todas' ? ' en esta zona' : '')+'.</div>';
-      return;
+    if (this.leafletMap){
+      this.leafletMap.remove();
+      this.leafletMap = null;
     }
+    wrap.innerHTML = '<div id="mapLeaflet"></div>';
 
-    var minLat = puntos[0].lat, maxLat = puntos[0].lat, minLng = puntos[0].lng, maxLng = puntos[0].lng;
-    for (var j=1;j<puntos.length;j++){
-      if (puntos[j].lat < minLat) minLat = puntos[j].lat;
-      if (puntos[j].lat > maxLat) maxLat = puntos[j].lat;
-      if (puntos[j].lng < minLng) minLng = puntos[j].lng;
-      if (puntos[j].lng > maxLng) maxLng = puntos[j].lng;
-    }
-    var padLat = (maxLat - minLat) * 0.1 || 0.001;
-    var padLng = (maxLng - minLng) * 0.1 || 0.001;
-    minLat -= padLat; maxLat += padLat; minLng -= padLng; maxLng += padLng;
+    // Corrientes capital como centro por defecto si todavía no hay puntos guardados
+    var centro = [-27.4806, -58.8341];
+    var map = L.map('mapLeaflet', {zoomControl:true}).setView(centro, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+    this.leafletMap = map;
 
-    var W = 320, H = 320;
     var colorFor = {'st-leido':'#2f9e5b','st-parcial':'#e07b2a','st-problema':'#d9433f'};
-
-    var circles = '';
+    var bounds = [];
     for (var k=0;k<puntos.length;k++){
       var p = puntos[k];
-      var x = ((p.lng - minLng) / (maxLng - minLng)) * (W-24) + 12;
-      var y = H - (((p.lat - minLat) / (maxLat - minLat)) * (H-24) + 12); // invertido: lat mayor = más arriba
       var color = colorFor[p.cls] || '#999';
-      circles += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="6" fill="'+color+'" ' +
-        'stroke="#fff" stroke-width="1.5" onclick="MapMod.onPuntoTap(\''+escAttr(p.med)+'\')"><title>'+
-        escHtml(p.med+' · '+p.nom+' — '+p.label)+'</title></circle>';
+      var marker = L.circleMarker([p.lat, p.lng], {
+        radius: 9, color:'#fff', weight:2, fillColor:color, fillOpacity:1
+      }).addTo(map);
+      marker.bindPopup(
+        '<b>'+escHtml(p.med)+'</b><br>'+escHtml(p.nom)+'<br>'+escHtml(p.label)+
+        '<br><button style="margin-top:8px; padding:6px 10px; border-radius:8px; border:none; background:#e8a33d; color:#1a1206; font-weight:600; cursor:pointer;" onclick="MapMod.onPuntoTap(\''+escAttr(p.med)+'\')">Abrir medidor</button>'
+      );
+      bounds.push([p.lat, p.lng]);
     }
 
-    var svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" class="map-svg">' +
-      '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="var(--bg2)" rx="12"/>' +
-      circles +
-      '</svg>';
+    if (bounds.length){
+      map.fitBounds(bounds, {padding:[30,30], maxZoom:17});
+    }
+    setTimeout(function(){ map.invalidateSize(); }, 200);
 
-    wrap.innerHTML = svg + '<div class="dh-row" style="margin-top:8px; text-align:center">'+puntos.length+' medidores con ubicación · tocá un punto para abrirlo</div>';
+    contador.textContent = puntos.length
+      ? (puntos.length + ' medidores con ubicación · tocá un punto para ver detalle')
+      : ('Todavía no hay medidores con ubicación guardada' + (zonaFiltro!=='todas' ? ' en esta zona' : '') + '.');
   },
 
   onPuntoTap: function(med){
