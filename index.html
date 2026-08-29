@@ -228,12 +228,24 @@ nav.bottomnav button.active{color:var(--amber);}
 .agente-current b{color:var(--amber);}
 
 /* ---- ordenativos ---- */
-.ord-chips{display:flex; flex-wrap:wrap; gap:6px;}
-.ord-chip{
-  display:inline-flex; align-items:center; gap:7px; background:var(--panel2); border:1px solid var(--amber-dim);
-  border-radius:20px; padding:6px 10px; font-size:12.5px; color:var(--text);
+.ord-boxes{display:flex; gap:10px; flex-wrap:wrap;}
+.ord-box{
+  width:52px; height:52px; display:flex; align-items:center; justify-content:center;
+  font-size:21px; font-weight:700; cursor:pointer;
+  border:2px dashed var(--border); border-radius:11px; background:var(--bg2); color:var(--text);
 }
-.ord-chip b{cursor:pointer; color:var(--red); font-weight:700; font-size:14px; line-height:1;}
+.ord-box:active{border-color:var(--amber);}
+.ord-box.filled{border:2px solid var(--amber-dim); background:#20180a; color:var(--amber);}
+.ord-manual-row{display:flex; gap:10px; align-items:stretch;}
+.ord-manual-row input{
+  width:100px; flex:none; text-align:center; font-size:19px; font-weight:700;
+}
+.ord-preview{display:flex; flex-direction:row; flex-wrap:wrap; gap:8px; margin-top:10px;}
+.ord-preview-item{
+  font-size:12px; color:var(--text-dim); white-space:nowrap;
+  background:var(--panel2); border:1px solid var(--amber-dim); border-radius:20px; padding:6px 11px;
+}
+.ord-preview-item b{color:var(--amber);}
 .ord-list{max-height:52vh; overflow:auto; display:flex; flex-direction:column; gap:6px; margin-top:10px;}
 .ord-item{
   background:var(--bg2); border:1px solid var(--border); border-radius:9px; padding:10px 12px; cursor:pointer;
@@ -326,11 +338,16 @@ nav.bottomnav button.active{color:var(--amber);}
 
 <div class="modal-bg" id="ordenativoModal">
   <div class="modal-box">
-    <h3>Agregar ordenativo</h3>
+    <h3>Elegir ordenativo</h3>
+    <label class="flabel">Sé el número — escribilo y tocá "listo" en el teclado</label>
+    <div class="ord-manual-row">
+      <input type="text" inputmode="numeric" maxlength="2" id="ordenativoManualInput" placeholder="N°" enterkeyhint="done" onkeydown="if(event.key==='Enter') OrdMod.selectManual()">
+    </div>
+    <label class="flabel" style="margin-top:14px">No me acuerdo — buscar en la lista</label>
     <input type="text" id="ordenativoSearch" placeholder="Buscar código o descripción..." oninput="OrdMod.filter()">
     <div class="ord-list" id="ordenativoListModal"></div>
     <div class="btnrow" style="margin-top:12px">
-      <button class="primary" style="width:100%" onclick="OrdMod.closeModal()">Listo</button>
+      <button class="secondary" style="width:100%" onclick="OrdMod.closeModal()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -417,9 +434,18 @@ var AgenteMod = {
 };
 
 var OrdMod = {
-  openModal: function(){
+  targetIdx: 0,
+
+  openModal: function(idx){
+    this.targetIdx = (typeof idx === 'number') ? idx : 0;
     var input = document.getElementById('ordenativoSearch');
     if (input) input.value = '';
+    var manual = document.getElementById('ordenativoManualInput');
+    var actual = Detail.data.ordenativos[this.targetIdx];
+    if (manual){
+      manual.value = actual || '';
+      setTimeout(function(){ manual.focus(); manual.select(); }, 50);
+    }
     this.renderList('');
     document.getElementById('ordenativoModal').classList.add('show');
     App.pushNavState();
@@ -431,17 +457,32 @@ var OrdMod = {
     var q = document.getElementById('ordenativoSearch').value;
     this.renderList(q);
   },
+  selectManual: function(){
+    var input = document.getElementById('ordenativoManualInput');
+    var raw = (input.value || '').replace(/[^0-9]/g,'');
+    if (!raw){
+      // campo vacío: se borró con el teclado → quita el ordenativo de este casillero
+      this.quitar();
+      return;
+    }
+    var normalizado = String(parseInt(raw,10));
+    if (!ORD_BY_COD[normalizado]){
+      toast('El ordenativo '+raw+' no existe');
+      return;
+    }
+    this.select(normalizado);
+  },
   renderList: function(q){
     var ql = (q||'').toLowerCase().trim();
     var list = ORDENATIVOS.filter(function(o){
       return !ql || o.cod.toLowerCase().indexOf(ql)>=0 || o.desc.toLowerCase().indexOf(ql)>=0;
     });
-    var selected = Detail.data ? Detail.data.ordenativos : [];
+    var actual = Detail.data.ordenativos[this.targetIdx];
     var html = '';
     for (var i=0;i<list.length;i++){
       var o = list[i];
-      var isSel = selected.indexOf(o.cod)>=0;
-      html += '<div class="ord-item'+(isSel?' selected':'')+'" onclick="OrdMod.toggle(\''+o.cod+'\')">' +
+      var isSel = actual === o.cod;
+      html += '<div class="ord-item'+(isSel?' selected':'')+'" onclick="OrdMod.select(\''+o.cod+'\')">' +
         '<span class="o-cod">'+escHtml(o.cod)+'</span>' +
         '<span class="o-desc">'+escHtml(o.desc)+'</span>' +
         (isSel ? '<span class="o-check">✓</span>' : '') +
@@ -449,20 +490,15 @@ var OrdMod = {
     }
     document.getElementById('ordenativoListModal').innerHTML = html || '<div class="empty">Sin resultados</div>';
   },
-  toggle: function(cod){
-    var arr = Detail.data.ordenativos;
-    var idx = arr.indexOf(cod);
-    if (idx>=0){
-      arr.splice(idx,1);
-    } else {
-      if (arr.length >= MAX_ORDENATIVOS){
-        toast('Máximo '+MAX_ORDENATIVOS+' ordenativos por medidor');
-        return;
-      }
-      arr.push(cod);
-    }
+  select: function(cod){
+    Detail.data.ordenativos[this.targetIdx] = cod;
     Detail.renderOrdenativos();
-    this.renderList(document.getElementById('ordenativoSearch').value);
+    this.closeModal();
+  },
+  quitar: function(){
+    Detail.data.ordenativos[this.targetIdx] = '';
+    Detail.renderOrdenativos();
+    this.closeModal();
   }
 };
 
@@ -488,6 +524,15 @@ var ORD_BY_COD = {};
   for (var i=0;i<ORDENATIVOS.length;i++){ ORD_BY_COD[ORDENATIVOS[i].cod] = ORDENATIVOS[i]; }
 })();
 var MAX_ORDENATIVOS = 5;
+
+/* Arma un array de longitud fija (MAX_ORDENATIVOS) con '' en los casilleros
+   vacíos, a partir de una lista guardada (compacta o no). */
+function padOrdenativos(list){
+  var compact = (list || []).filter(function(c){ return !!c; });
+  var out = compact.slice(0, MAX_ORDENATIVOS);
+  while (out.length < MAX_ORDENATIVOS){ out.push(''); }
+  return out;
+}
 
 /* Estado derivado a partir de lectura + ordenativos cargados (ya no hay un solo "estado" fijo) */
 function derivedStatus(r){
@@ -915,7 +960,7 @@ var Detail = {
     this.data = {
       med: med,
       lectura: saved.lectura || '',
-      ordenativos: (saved.ordenativos || []).slice(),
+      ordenativos: padOrdenativos(saved.ordenativos),
       obs: saved.obs || '',
       cambioMedidor: !!saved.cambioMedidor,
       medidorAnterior: saved.medidorAnterior || '',
@@ -947,8 +992,8 @@ var Detail = {
     '</fieldset>' +
 
     '<fieldset><legend>Novedades (ordenativos)</legend>' +
-      '<div class="ord-chips" id="ordChips"></div>' +
-      '<button class="secondary" style="width:100%; margin-top:8px" onclick="OrdMod.openModal()">＋ Agregar ordenativo (hasta '+MAX_ORDENATIVOS+')</button>' +
+      '<div class="ord-boxes" id="ordBoxes"></div>' +
+      '<div class="ord-preview" id="ordPreview"></div>' +
     '</fieldset>' +
 
     '<fieldset><legend>Cambio de medidor</legend>' +
@@ -980,24 +1025,33 @@ var Detail = {
   },
 
   renderOrdenativos: function(){
-    var el = document.getElementById('ordChips');
+    var el = document.getElementById('ordBoxes');
     if (!el) return;
     var arr = this.data.ordenativos;
+    var html = '';
+    for (var i=0;i<MAX_ORDENATIVOS;i++){
+      var val = arr[i] || '';
+      var cls = 'ord-box' + (val ? ' filled' : '');
+      html += '<div class="'+cls+'" onclick="OrdMod.openModal('+i+')">'+(val?escHtml(val):'')+'</div>';
+    }
+    el.innerHTML = html;
+    this.renderOrdPreview();
+  },
+
+  renderOrdPreview: function(){
+    var el = document.getElementById('ordPreview');
+    if (!el) return;
+    var arr = this.data.ordenativos.filter(function(c){ return !!c; });
     if (!arr.length){
-      el.innerHTML = '<div class="dh-row" style="margin:0">Sin novedades cargadas</div>';
+      el.innerHTML = '<div class="dh-row" style="margin:6px 0 0">Sin novedades cargadas — tocá un cuadrado para elegir</div>';
       return;
     }
     var html = '';
     for (var i=0;i<arr.length;i++){
       var o = ORD_BY_COD[arr[i]];
-      html += '<span class="ord-chip">'+escHtml(arr[i])+(o?' - '+escHtml(o.desc):'')+' <b onclick="Detail.removeOrdenativo(\''+arr[i]+'\')">✕</b></span>';
+      html += '<div class="ord-preview-item"><b>'+escHtml(arr[i])+'</b> — '+(o?escHtml(o.desc):'código no encontrado')+'</div>';
     }
     el.innerHTML = html;
-  },
-  removeOrdenativo: function(cod){
-    var idx = this.data.ordenativos.indexOf(cod);
-    if (idx>=0) this.data.ordenativos.splice(idx,1);
-    this.renderOrdenativos();
   },
 
   updateGpsUI: function(){
@@ -1034,7 +1088,7 @@ var Detail = {
     var lectura = document.getElementById('fLectura').value.trim();
     var obs = document.getElementById('fObs').value.trim();
     var medAnterior = document.getElementById('fMedAnterior') ? document.getElementById('fMedAnterior').value.trim() : '';
-    var ordenativos = this.data.ordenativos;
+    var ordenativos = this.data.ordenativos.filter(function(c){ return !!c; });
 
     if (!lectura && ordenativos.length===0){
       toast('Ingresá una lectura o al menos un ordenativo');

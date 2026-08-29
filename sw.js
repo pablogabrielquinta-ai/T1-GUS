@@ -1,6 +1,6 @@
 /* Service worker mínimo: cachea la app para que abra offline
    y sirva desde caché cuando no hay conexión. */
-var CACHE_NAME = 'gu-t1-cache-v20';
+var CACHE_NAME = 'gu-t1-cache-v26';
 var APP_SHELL = [
   './',
   './index.html',
