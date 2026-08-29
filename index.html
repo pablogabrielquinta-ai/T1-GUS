@@ -113,6 +113,7 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 .summary-chip span{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.3px;}
 .summary-chip.done b{color:var(--green);}
 .summary-chip.novedad b{color:var(--orange);}
+.summary-chip.problema b{color:var(--red);}
 
 /* ---- filtro pendientes/relevados ---- */
 .filter-row{display:flex; gap:8px; margin-bottom:10px; overflow-x:auto; padding-bottom:2px;}
@@ -134,6 +135,8 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 .zona-card .zname{font-weight:600; font-size:15px; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .zona-card .zbar{height:6px; border-radius:4px; background:var(--border); overflow:hidden;}
 .zona-card .zbar-fill{height:100%; background:var(--green); border-radius:4px;}
+.zona-card .zstats{display:flex; gap:8px; margin-top:5px; flex-wrap:wrap;}
+.zona-card .zstat{font-size:11px; font-weight:600; color:var(--text-dim);}
 .zona-card .zcount{font-size:11.5px; color:var(--text-dim); margin-top:4px;}
 .zona-card .zpct{font-size:16px; font-weight:700; color:var(--amber); min-width:44px; text-align:right;}
 
@@ -307,6 +310,15 @@ nav.bottomnav button.active{color:var(--amber);}
 .ord-item .o-desc{flex:1; font-size:12.5px;}
 .ord-item .o-check{color:var(--green); flex-shrink:0;}
 
+/* ---- mapa ---- */
+.map-legend{display:flex; gap:14px; flex-wrap:wrap; margin:10px 0; font-size:12px; color:var(--text-dim);}
+.map-legend span{display:flex; align-items:center; gap:5px;}
+.map-legend .dot{width:10px; height:10px; border-radius:50%; display:inline-block;}
+.map-legend .dot-ok{background:var(--green);}
+.map-legend .dot-nov{background:var(--orange);}
+.map-legend .dot-prob{background:var(--red);}
+.map-svg{width:100%; height:auto; border-radius:12px; border:1px solid var(--border); background:var(--panel);}
+
 /* ---- misc ---- */
 .section-title{font-size:12.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 8px;}
 .section-title:first-child{margin-top:0;}
@@ -364,8 +376,12 @@ nav.bottomnav button.active{color:var(--amber);}
   <!-- PANTALLA: EXPORTAR -->
   <section class="screen" id="screen-export"></section>
 
+  <!-- PANTALLA: MAPA -->
+  <section class="screen" id="screen-map"></section>
+
   <nav class="bottomnav">
     <button id="navHome" onclick="App.goHome()"><span class="ic">🏠</span>Inicio</button>
+    <button id="navMap" onclick="App.goMap()"><span class="ic">🗺️</span>Mapa</button>
     <button id="navExport" onclick="App.goExport()"><span class="ic">⬆️</span>Exportar</button>
   </nav>
 
@@ -687,6 +703,20 @@ function derivedStatus(r){
   return {cls:'st-pendiente', label:'Pendiente'};
 }
 
+/* Cuenta OK / Novedad / Problema / Pendiente para una lista de usuarios (una zona, o todos). */
+function computeStats(userList){
+  var stats = {total:userList.length, ok:0, novedad:0, problema:0, pendiente:0};
+  for (var i=0;i<userList.length;i++){
+    var r = LECTURAS[userList[i].med];
+    var st = derivedStatus(r);
+    if (st.cls === 'st-leido') stats.ok++;
+    else if (st.cls === 'st-parcial') stats.novedad++;
+    else if (st.cls === 'st-problema') stats.problema++;
+    else stats.pendiente++;
+  }
+  return stats;
+}
+
 /* Ordenativos que indican "no se pudo acceder / no se encontró el medidor".
    Si además se cargó una lectura, es contradictorio y conviene avisar. */
 var CODIGOS_SIN_ACCESO = ['1','4','5','6','7','9'];
@@ -830,8 +860,10 @@ var App = {
     document.getElementById('btnBack').classList.toggle('hidden', name==='home');
     var navHome = document.getElementById('navHome');
     var navExport = document.getElementById('navExport');
+    var navMap = document.getElementById('navMap');
     navHome.classList.toggle('active', name==='home' || name==='zona' || name==='detail');
     navExport.classList.toggle('active', name==='export');
+    navMap.classList.toggle('active', name==='map');
     window.scrollTo(0,0);
   },
 
@@ -851,6 +883,15 @@ var App = {
     this.showScreen('export');
     document.getElementById('hdrTitle').textContent = 'Exportar';
     document.getElementById('hdrSub').textContent = 'CSV / PDF';
+  },
+
+  goMap: function(){
+    this.pushNavState();
+    this.stack.push('map');
+    MapMod.render();
+    this.showScreen('map');
+    document.getElementById('hdrTitle').textContent = 'Mapa';
+    document.getElementById('hdrSub').textContent = 'Relevamiento GU';
   },
 
   /* Botón ‹ de la cabecera: delega en el navegador para que quede
@@ -917,6 +958,11 @@ var App = {
       document.getElementById('hdrTitle').textContent = 'Exportar';
       document.getElementById('hdrSub').textContent = 'CSV / PDF';
       this.showScreen('export');
+    } else if (prev === 'map'){
+      MapMod.render();
+      document.getElementById('hdrTitle').textContent = 'Mapa';
+      document.getElementById('hdrSub').textContent = 'Relevamiento GU';
+      this.showScreen('map');
     } else {
       this.renderHome();
       this.showScreen('home');
@@ -935,41 +981,38 @@ var App = {
 
   /* ---- HOME ---- */
   renderHome: function(){
-    var total = USERS.length, done = 0, conNovedad = 0;
-    for (var k in LECTURAS){
-      if (!LECTURAS.hasOwnProperty(k)) continue;
-      var r = LECTURAS[k];
-      var hasLectura = !!(r.lectura), hasOrd = !!(r.ordenativos && r.ordenativos.length);
-      if (hasLectura || hasOrd){
-        done++;
-        if (hasOrd) conNovedad++;
-      }
-    }
+    var total = USERS.length;
+    var globalStats = computeStats(USERS);
     var strip = document.getElementById('summaryStrip');
     strip.innerHTML =
-      '<div class="summary-chip done"><b>'+done+'</b><span>Relevados</span></div>' +
-      '<div class="summary-chip"><b>'+(total-done)+'</b><span>Pendientes</span></div>' +
-      '<div class="summary-chip novedad"><b>'+conNovedad+'</b><span>Con novedad</span></div>' +
+      '<div class="summary-chip done"><b>'+(globalStats.ok+globalStats.novedad+globalStats.problema)+'</b><span>Relevados</span></div>' +
+      '<div class="summary-chip"><b>'+globalStats.pendiente+'</b><span>Pendientes</span></div>' +
+      '<div class="summary-chip novedad"><b>'+(globalStats.novedad+globalStats.problema)+'</b><span>Con novedad</span></div>' +
       '<div class="summary-chip"><b>'+total+'</b><span>Total GU</span></div>';
 
-    var counts = {};
+    var byZona = {};
     for (var i=0;i<USERS.length;i++){
       var z = USERS[i].zona;
-      counts[z] = counts[z] || {total:0, done:0};
-      counts[z].total++;
-      var lr = LECTURAS[USERS[i].med];
-      if (lr && ((lr.lectura) || (lr.ordenativos && lr.ordenativos.length))) counts[z].done++;
+      byZona[z] = byZona[z] || [];
+      byZona[z].push(USERS[i]);
     }
     var html = '';
     for (var j=0;j<ZONAS.length;j++){
       var zn = ZONAS[j];
-      var c = counts[zn] || {total:0, done:0};
-      var pct = c.total ? Math.round(c.done*100/c.total) : 0;
+      var st = computeStats(byZona[zn] || []);
+      var done = st.ok + st.novedad + st.problema;
+      var pct = st.total ? Math.round(done*100/st.total) : 0;
       html += '<div class="zona-card" onclick="App.openZona(\''+escAttr(zn)+'\')">' +
         '<div class="zinfo">' +
           '<div class="zname">'+escHtml(zn)+'</div>' +
           '<div class="zbar"><div class="zbar-fill" style="width:'+pct+'%"></div></div>' +
-          '<div class="zcount">'+c.done+' / '+c.total+' medidores</div>' +
+          '<div class="zstats">' +
+            '<span class="zstat zs-ok">🟢 '+st.ok+'</span>' +
+            '<span class="zstat zs-novedad">🟠 '+st.novedad+'</span>' +
+            '<span class="zstat zs-problema">🔴 '+st.problema+'</span>' +
+            '<span class="zstat zs-pendiente">⚪ '+st.pendiente+'</span>' +
+          '</div>' +
+          '<div class="zcount">'+done+' / '+st.total+' = '+pct+'%</div>' +
         '</div>' +
         '<div class="zpct">'+pct+'%</div>' +
       '</div>';
@@ -1025,20 +1068,17 @@ var App = {
   renderZonaList: function(q){
     var zona = this.currentZona;
     var list = USERS.filter(function(u){ return u.zona === zona; });
-    var total = list.length, done = 0, novedad = 0;
-    for (var i=0;i<list.length;i++){
-      var r = LECTURAS[list[i].med];
-      if (r && ((r.lectura) || (r.ordenativos && r.ordenativos.length))){
-        done++;
-        if (r.ordenativos && r.ordenativos.length) novedad++;
-      }
-    }
+    var st = computeStats(list);
+    var total = st.total, done = st.ok + st.novedad + st.problema;
+    var pct = total ? Math.round(done*100/total) : 0;
     document.getElementById('zonaSummaryStrip').innerHTML =
-      '<div class="summary-chip done"><b>'+done+'</b><span>Relevados</span></div>' +
-      '<div class="summary-chip"><b>'+(total-done)+'</b><span>Pendientes</span></div>' +
-      '<div class="summary-chip novedad"><b>'+novedad+'</b><span>Novedades</span></div>';
+      '<div class="summary-chip done"><b>🟢 '+st.ok+'</b><span>OK</span></div>' +
+      '<div class="summary-chip novedad"><b>🟠 '+st.novedad+'</b><span>Novedad</span></div>' +
+      '<div class="summary-chip problema"><b>🔴 '+st.problema+'</b><span>Problema</span></div>' +
+      '<div class="summary-chip"><b>⚪ '+st.pendiente+'</b><span>Pendiente</span></div>' +
+      '<div class="summary-chip"><b>'+done+'/'+total+'</b><span>'+pct+'%</span></div>';
 
-    this.renderZonaFilterRow(total, done, novedad);
+    this.renderZonaFilterRow(total, done, st.novedad + st.problema);
 
     if (q){
       var ql = q.toLowerCase();
@@ -1142,6 +1182,12 @@ var App = {
       '<fieldset><legend>PDF</legend>' +
         '<p class="dh-row" style="margin-top:0">Genera una planilla imprimible. Se abre el diálogo de impresión: elegí "Guardar como PDF".</p>' +
         '<button class="secondary" style="width:100%" onclick="ExportMod.exportPDF()">🖨️ Generar PDF</button>' +
+      '</fieldset>' +
+      '<fieldset><legend>Respaldo del trabajo</legend>' +
+        '<p class="dh-row" style="margin-top:0">A diferencia del CSV, el respaldo guarda TODO tal cual está (incluidas las fotos) para poder seguir cargando después o pasarlo a otro celular.</p>' +
+        '<button class="primary" style="width:100%; margin-bottom:10px" onclick="BackupMod.crear()">💾 Crear respaldo</button>' +
+        '<button class="secondary" style="width:100%" onclick="BackupMod.elegirArchivo()">📥 Restaurar respaldo</button>' +
+        '<input type="file" id="backupFileInput" accept="application/json,.json" class="hidden" onchange="BackupMod.onFileSelected(event)">' +
       '</fieldset>' +
       '<fieldset><legend>Mantenimiento</legend>' +
         '<p class="dh-row" style="margin-top:0">Borra todas las lecturas cargadas en este dispositivo. Esta acción no se puede deshacer.</p>' +
@@ -1541,8 +1587,16 @@ var ExportMod = {
 
   exportPDF: function(){
     var rows = this.buildRows();
-    var total = rows.length, done = 0;
-    for (var i=0;i<rows.length;i++){ if (rows[i].estado !== 'Pendiente') done++; }
+    var total = rows.length;
+    var okG=0, novG=0, probG=0, penG=0;
+    for (var i=0;i<rows.length;i++){
+      var e = rows[i].estado;
+      if (e === 'Leído OK') okG++;
+      else if (e === 'Leído c/ novedad') novG++;
+      else if (e === 'Con novedad, s/lectura') probG++;
+      else penG++;
+    }
+    var done = okG + novG + probG;
     var fecha = new Date().toLocaleString('es-AR');
     var byZona = {};
     for (var j=0;j<rows.length;j++){
@@ -1555,7 +1609,24 @@ var ExportMod = {
     for (var k=0;k<zonasOrdenadas.length;k++){
       var zn = zonasOrdenadas[k];
       var list = byZona[zn];
+      var zOk=0, zNov=0, zProb=0, zPen=0;
+      for (var n=0;n<list.length;n++){
+        var e2 = list[n].estado;
+        if (e2 === 'Leído OK') zOk++;
+        else if (e2 === 'Leído c/ novedad') zNov++;
+        else if (e2 === 'Con novedad, s/lectura') zProb++;
+        else zPen++;
+      }
+      var zDone = zOk + zNov + zProb;
+      var zPct = list.length ? Math.round(zDone*100/list.length) : 0;
       body += '<h3>'+escHtml(zn)+' <small>('+list.length+')</small></h3>';
+      body += '<div class="zsum">' +
+        '<span class="dot-ok">🟢 OK: '+zOk+'</span>' +
+        '<span class="dot-nov">🟠 Novedad: '+zNov+'</span>' +
+        '<span class="dot-prob">🔴 Problema: '+zProb+'</span>' +
+        '<span class="dot-pen">⚪ Pendiente: '+zPen+'</span>' +
+        '<span class="dot-total"><b>'+zDone+'/'+list.length+' = '+zPct+'%</b></span>' +
+      '</div>';
       body += '<table><thead><tr><th>N° Medidor</th><th>Cliente</th><th>Dirección</th><th>Lectura</th><th>Estado</th><th>Ordenativos</th><th>Cambio</th><th>Agente</th></tr></thead><tbody>';
       for (var m=0;m<list.length;m++){
         var r = list[m];
@@ -1572,11 +1643,15 @@ var ExportMod = {
       '<style>' +
       'body{font-family:Arial,Helvetica,sans-serif; color:#111; margin:24px; font-size:11px;}' +
       'h1{font-size:18px; margin-bottom:2px;} .sub{color:#555; margin-bottom:14px; font-size:11px;}' +
-      '.stats{display:flex; gap:16px; margin-bottom:16px;}' +
+      '.stats{display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;}' +
       '.stat{border:1px solid #ccc; border-radius:6px; padding:6px 12px;}' +
       '.stat b{font-size:15px; display:block;}' +
+      '.stat.ok{border-color:#2f9e5b; color:#2f9e5b;} .stat.nov{border-color:#e07b2a; color:#e07b2a;}' +
+      '.stat.prob{border-color:#d9433f; color:#d9433f;} .stat.pen{border-color:#999; color:#666;}' +
       'h3{font-size:13px; margin:16px 0 4px; border-bottom:2px solid #e8a33d; padding-bottom:3px;}' +
       'h3 small{color:#777; font-weight:normal;}' +
+      '.zsum{display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; margin-bottom:6px;}' +
+      '.zsum .dot-ok{color:#2f9e5b;} .zsum .dot-nov{color:#e07b2a;} .zsum .dot-prob{color:#d9433f;} .zsum .dot-pen{color:#777;} .zsum .dot-total{color:#111;}' +
       'table{width:100%; border-collapse:collapse; margin-bottom:8px;}' +
       'th,td{border:1px solid #ddd; padding:4px 6px; text-align:left; font-size:10px;}' +
       'th{background:#f2f2f2;}' +
@@ -1586,8 +1661,11 @@ var ExportMod = {
       '<div class="sub">Generado el ' + fecha + '</div>' +
       '<div class="stats">' +
         '<div class="stat"><b>'+total+'</b>Total</div>' +
-        '<div class="stat"><b>'+done+'</b>Relevados</div>' +
-        '<div class="stat"><b>'+(total-done)+'</b>Pendientes</div>' +
+        '<div class="stat ok"><b>'+okG+'</b>🟢 OK</div>' +
+        '<div class="stat nov"><b>'+novG+'</b>🟠 Novedad</div>' +
+        '<div class="stat prob"><b>'+probG+'</b>🔴 Problema</div>' +
+        '<div class="stat pen"><b>'+penG+'</b>⚪ Pendiente</div>' +
+        '<div class="stat"><b>'+(total?Math.round(done*100/total):0)+'%</b>Avance</div>' +
       '</div>' +
       body +
       '</body></html>'
@@ -1632,6 +1710,194 @@ function clearAllLocalDataSilent(cb){
     };
   });
 }
+
+/* ---------------- Respaldo / Restauración ---------------- */
+var BackupMod = {
+  crear: function(){
+    dbGetAll(function(all){
+      var payload = {
+        app: 'Relevamiento GU',
+        version: 1,
+        exportadoEl: new Date().toISOString(),
+        cantidadRegistros: all.length,
+        registros: all
+      };
+      var json = JSON.stringify(payload);
+      var blob = new Blob([json], {type:'application/json'});
+      var fecha = new Date().toISOString().substring(0,10);
+      var filename = 'GU_Respaldo_' + fecha + '.json';
+
+      if (navigator.canShare && navigator.share){
+        try {
+          var file = new File([blob], filename, {type:'application/json'});
+          if (navigator.canShare({files:[file]})){
+            navigator.share({
+              files:[file],
+              title:'Respaldo Relevamiento GU',
+              text:'Respaldo completo - ' + fecha
+            })['catch'](function(err){
+              if (err && err.name !== 'AbortError') downloadBlob(blob, filename);
+            });
+            toast('Respaldo generado ('+all.length+' registros)');
+            return;
+          }
+        } catch(e){}
+      }
+      downloadBlob(blob, filename);
+      toast('Respaldo descargado ('+all.length+' registros)');
+    });
+  },
+
+  elegirArchivo: function(){
+    var input = document.getElementById('backupFileInput');
+    if (input) input.click();
+  },
+
+  onFileSelected: function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var payload;
+      try {
+        payload = JSON.parse(e.target.result);
+      } catch(err){
+        toast('Ese archivo no es un respaldo válido');
+        return;
+      }
+      var registros = payload && payload.registros;
+      if (!registros || !registros.length){
+        toast('El respaldo no tiene registros para importar');
+        return;
+      }
+      var msg = 'El respaldo tiene ' + registros.length + ' medidores cargados' +
+        (payload.exportadoEl ? (' (del ' + payload.exportadoEl.substring(0,10) + ')') : '') +
+        '. Esto va a reemplazar los datos actuales de este dispositivo. ¿Continuar?';
+      if (!confirm(msg)) return;
+      BackupMod.importarRegistros(registros);
+    };
+    reader.onerror = function(){ toast('No se pudo leer el archivo'); };
+    reader.readAsText(file);
+  },
+
+  importarRegistros: function(registros){
+    openDB(function(d){
+      var tx = d.transaction('lecturas','readwrite');
+      var store = tx.objectStore('lecturas');
+      store.clear().onsuccess = function(){
+        var i = 0;
+        function siguiente(){
+          if (i >= registros.length){
+            refreshCache(function(){
+              toast('Respaldo restaurado ✓ ('+registros.length+' medidores)');
+              App.renderExport();
+            });
+            return;
+          }
+          var rec = registros[i];
+          i++;
+          if (!rec || !rec.med){ siguiente(); return; }
+          var req = store.put(rec);
+          req.onsuccess = siguiente;
+          req.onerror = siguiente;
+        }
+        siguiente();
+      };
+    });
+  }
+};
+
+/* ---------------- Mapa del relevamiento ---------------- */
+var MapMod = {
+  zonaFiltro: 'todas',
+
+  render: function(){
+    var opciones = '<option value="todas">Todas las zonas</option>';
+    for (var i=0;i<ZONAS.length;i++){
+      var sel = this.zonaFiltro===ZONAS[i] ? ' selected' : '';
+      opciones += '<option value="'+escAttr(ZONAS[i])+'"'+sel+'>'+escHtml(ZONAS[i])+'</option>';
+    }
+    var html =
+      '<div class="detail-head">' +
+        '<h2>Mapa del relevamiento</h2>' +
+        '<div class="dh-row">Ubicación capturada al abrir cada medidor. Solo aparecen los que ya tienen una lectura u ordenativo guardado.</div>' +
+      '</div>' +
+      '<label class="flabel">Filtrar por zona</label>' +
+      '<select id="mapZonaSelect" onchange="MapMod.onZonaChange()">'+opciones+'</select>' +
+      '<div class="map-legend">' +
+        '<span><span class="dot dot-ok"></span>Leído OK</span>' +
+        '<span><span class="dot dot-nov"></span>Con novedad</span>' +
+        '<span><span class="dot dot-prob"></span>Problema / s/lectura</span>' +
+      '</div>' +
+      '<div id="mapSvgWrap"></div>';
+    document.getElementById('screen-map').innerHTML = html;
+    this.renderSVG();
+  },
+
+  onZonaChange: function(){
+    this.zonaFiltro = document.getElementById('mapZonaSelect').value;
+    this.renderSVG();
+  },
+
+  renderSVG: function(){
+    var wrap = document.getElementById('mapSvgWrap');
+    if (!wrap) return;
+    var zonaFiltro = this.zonaFiltro;
+
+    var puntos = [];
+    for (var i=0;i<USERS.length;i++){
+      var u = USERS[i];
+      if (zonaFiltro !== 'todas' && u.zona !== zonaFiltro) continue;
+      var r = LECTURAS[u.med];
+      if (!r || r.lat == null || r.lng == null) continue;
+      var st = derivedStatus(r);
+      puntos.push({med:u.med, nom:u.nom, zona:u.zona, lat:r.lat, lng:r.lng, cls:st.cls, label:st.label});
+    }
+
+    if (!puntos.length){
+      wrap.innerHTML = '<div class="empty">Todavía no hay medidores con ubicación guardada'+(zonaFiltro!=='todas' ? ' en esta zona' : '')+'.</div>';
+      return;
+    }
+
+    var minLat = puntos[0].lat, maxLat = puntos[0].lat, minLng = puntos[0].lng, maxLng = puntos[0].lng;
+    for (var j=1;j<puntos.length;j++){
+      if (puntos[j].lat < minLat) minLat = puntos[j].lat;
+      if (puntos[j].lat > maxLat) maxLat = puntos[j].lat;
+      if (puntos[j].lng < minLng) minLng = puntos[j].lng;
+      if (puntos[j].lng > maxLng) maxLng = puntos[j].lng;
+    }
+    var padLat = (maxLat - minLat) * 0.1 || 0.001;
+    var padLng = (maxLng - minLng) * 0.1 || 0.001;
+    minLat -= padLat; maxLat += padLat; minLng -= padLng; maxLng += padLng;
+
+    var W = 320, H = 320;
+    var colorFor = {'st-leido':'#2f9e5b','st-parcial':'#e07b2a','st-problema':'#d9433f'};
+
+    var circles = '';
+    for (var k=0;k<puntos.length;k++){
+      var p = puntos[k];
+      var x = ((p.lng - minLng) / (maxLng - minLng)) * (W-24) + 12;
+      var y = H - (((p.lat - minLat) / (maxLat - minLat)) * (H-24) + 12); // invertido: lat mayor = más arriba
+      var color = colorFor[p.cls] || '#999';
+      circles += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="6" fill="'+color+'" ' +
+        'stroke="#fff" stroke-width="1.5" onclick="MapMod.onPuntoTap(\''+escAttr(p.med)+'\')"><title>'+
+        escHtml(p.med+' · '+p.nom+' — '+p.label)+'</title></circle>';
+    }
+
+    var svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" class="map-svg">' +
+      '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="var(--bg2)" rx="12"/>' +
+      circles +
+      '</svg>';
+
+    wrap.innerHTML = svg + '<div class="dh-row" style="margin-top:8px; text-align:center">'+puntos.length+' medidores con ubicación · tocá un punto para abrirlo</div>';
+  },
+
+  onPuntoTap: function(med){
+    App.currentZona = USERS_BY_MED[med] ? USERS_BY_MED[med].zona : App.currentZona;
+    App.openDetail(med);
+  }
+};
 
 function csvEscape(v){
   var s = (v==null) ? '' : String(v);
