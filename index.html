@@ -1529,7 +1529,8 @@ var ExportMod = {
         obs: r.obs || '', obsListado: u.obs || '',
         fecha: r.timestamp ? r.timestamp.replace('T',' ').substring(0,16) : '',
         agente: r.agenteNombre || '', agenteCod: r.agenteCod || '',
-        tieneFoto: r.fotoMedidor ? 'SI' : 'NO'
+        tieneFoto: r.fotoMedidor ? 'SI' : 'NO',
+        foto: r.fotoMedidor || null
       });
     }
     return rows;
@@ -1630,10 +1631,38 @@ var ExportMod = {
         '<span class="dot-pen">⚪ Pendiente: '+zPen+'</span>' +
         '<span class="dot-total"><b>'+zDone+'/'+list.length+' = '+zPct+'%</b></span>' +
       '</div>';
-      body += '<table><thead><tr><th>N° Medidor</th><th>Cliente</th><th>Dirección</th><th>Lectura</th><th>Estado</th><th>Ordenativos</th><th>Cambio</th><th>Agente</th></tr></thead><tbody>';
+      body += '<table><thead><tr>' +
+        '<th>N° Medidor</th><th>Cliente</th><th>US</th><th>Instalación</th><th>Dirección</th>' +
+        '<th>Tipo</th><th>UG</th><th>Lectura</th><th>Estado</th><th>Ordenativos (cód.)</th><th>Ordenativos (detalle)</th>' +
+        '<th>Cambio</th><th>Medidor Anterior</th><th>Latitud</th><th>Longitud</th>' +
+        '<th>Obs. Lecturista</th><th>Obs. Listado</th><th>Fecha/Hora</th><th>Agente</th><th>Cod. Agente</th><th>Foto</th>' +
+        '</tr></thead><tbody>';
       for (var m=0;m<list.length;m++){
         var r = list[m];
-        body += '<tr><td>'+escHtml(r.med)+'</td><td>'+escHtml(r.nom)+'</td><td>'+escHtml(r.dir)+'</td><td>'+escHtml(r.lectura)+'</td><td>'+escHtml(r.estado)+'</td><td>'+escHtml(r.ordenativos)+'</td><td>'+escHtml(r.cambioMedidor)+'</td><td>'+escHtml(r.agente)+'</td></tr>';
+        var fotoCelda = r.foto ? '<img src="'+r.foto+'" class="foto-mini">' : '—';
+        body += '<tr>' +
+          '<td>'+escHtml(r.med)+'</td>' +
+          '<td>'+escHtml(r.nom)+'</td>' +
+          '<td>'+escHtml(r.us)+'</td>' +
+          '<td>'+escHtml(r.inst)+'</td>' +
+          '<td>'+escHtml(r.dir)+'</td>' +
+          '<td>'+escHtml(r.tipo)+'</td>' +
+          '<td>'+escHtml(r.ug)+'</td>' +
+          '<td>'+escHtml(r.lectura)+'</td>' +
+          '<td>'+escHtml(r.estado)+'</td>' +
+          '<td>'+escHtml(r.ordenativos)+'</td>' +
+          '<td>'+escHtml(r.ordenativosDetalle)+'</td>' +
+          '<td>'+escHtml(r.cambioMedidor)+'</td>' +
+          '<td>'+escHtml(r.medidorAnterior)+'</td>' +
+          '<td>'+escHtml(r.lat)+'</td>' +
+          '<td>'+escHtml(r.lng)+'</td>' +
+          '<td>'+escHtml(r.obs)+'</td>' +
+          '<td>'+escHtml(r.obsListado)+'</td>' +
+          '<td>'+escHtml(r.fecha)+'</td>' +
+          '<td>'+escHtml(r.agente)+'</td>' +
+          '<td>'+escHtml(r.agenteCod)+'</td>' +
+          '<td>'+fotoCelda+'</td>' +
+        '</tr>';
       }
       body += '</tbody></table>';
     }
@@ -1644,7 +1673,8 @@ var ExportMod = {
     doc.write(
       '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Relevamiento GU - Informe</title>' +
       '<style>' +
-      'body{font-family:Arial,Helvetica,sans-serif; color:#111; margin:24px; font-size:11px;}' +
+      '@page{size:landscape;}' +
+      'body{font-family:Arial,Helvetica,sans-serif; color:#111; margin:18px; font-size:10px;}' +
       'h1{font-size:18px; margin-bottom:2px;} .sub{color:#555; margin-bottom:14px; font-size:11px;}' +
       '.stats{display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;}' +
       '.stat{border:1px solid #ccc; border-radius:6px; padding:6px 12px;}' +
@@ -1655,9 +1685,10 @@ var ExportMod = {
       'h3 small{color:#777; font-weight:normal;}' +
       '.zsum{display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; margin-bottom:6px;}' +
       '.zsum .dot-ok{color:#2f9e5b;} .zsum .dot-nov{color:#e07b2a;} .zsum .dot-prob{color:#d9433f;} .zsum .dot-pen{color:#777;} .zsum .dot-total{color:#111;}' +
-      'table{width:100%; border-collapse:collapse; margin-bottom:8px;}' +
-      'th,td{border:1px solid #ddd; padding:4px 6px; text-align:left; font-size:10px;}' +
+      'table{width:100%; border-collapse:collapse; margin-bottom:10px; table-layout:auto;}' +
+      'th,td{border:1px solid #ddd; padding:3px 5px; text-align:left; font-size:8.5px; vertical-align:middle;}' +
       'th{background:#f2f2f2;}' +
+      '.foto-mini{width:34px; height:34px; object-fit:cover; border-radius:3px; display:block;}' +
       '@media print{ h3{page-break-after:avoid;} tr{page-break-inside:avoid;} }' +
       '</style></head><body>' +
       '<h1>DPEC · Relevamiento GU</h1>' +

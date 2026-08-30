@@ -4,7 +4,7 @@
    El caché de recursos externos (mapa de calles, Leaflet) es
    independiente y NO se borra, así lo que ya se vio del mapa
    queda guardado aunque actualicemos la app. */
-var CACHE_NAME = 'gu-t1-cache-v30';
+var CACHE_NAME = 'gu-t1-cache-v31';
 var EXTERNAL_CACHE = 'gu-t1-external-v1';
 var APP_SHELL = [
   './',
