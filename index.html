@@ -254,6 +254,12 @@ nav.bottomnav button.active{color:var(--amber);}
 .camera-cancel{background:none; border:none; color:#fff; font-size:15px; padding:10px; cursor:pointer;}
 .camera-spacer{width:70px; flex-shrink:0;}
 .camera-error{color:#fff; text-align:center; padding:40px 24px; font-size:14px;}
+.camera-zoom-row{
+  display:flex; align-items:center; gap:10px; padding:10px 24px; background:rgba(0,0,0,.55);
+}
+.camera-zoom-ico{font-size:13px; opacity:.7; flex-shrink:0;}
+.camera-zoom-ico.big{font-size:19px; opacity:1;}
+.camera-zoom-row input[type=range]{flex:1; accent-color:var(--amber); height:24px;}
 
 /* ---- foto del medidor ---- */
 .foto-thumb-wrap{position:relative; width:120px; height:120px; border-radius:11px; overflow:hidden; border:1px solid var(--border);}
@@ -395,6 +401,11 @@ nav.bottomnav button.active{color:var(--amber);}
 <div class="modal-bg" id="cameraModal">
   <div class="camera-wrap">
     <video id="cameraVideo" autoplay playsinline muted></video>
+    <div class="camera-zoom-row hidden" id="cameraZoomRow">
+      <span class="camera-zoom-ico">🔍</span>
+      <input type="range" id="cameraZoomSlider" min="1" max="1" step="0.1" value="1" oninput="CameraMod.onZoomChange(this.value)">
+      <span class="camera-zoom-ico big">🔍</span>
+    </div>
     <div class="camera-controls">
       <button class="camera-cancel" onclick="CameraMod.cancel()">Cancelar</button>
       <button class="camera-shutter" onclick="CameraMod.capture()">📷</button>
@@ -535,9 +546,12 @@ var AgenteMod = {
 
 var CameraMod = {
   stream: null,
+  track: null,
 
   open: function(){
     var video = document.getElementById('cameraVideo');
+    var zoomRow = document.getElementById('cameraZoomRow');
+    if (zoomRow) zoomRow.classList.add('hidden');
     document.getElementById('cameraModal').classList.add('show');
     App.pushNavState();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
@@ -551,10 +565,47 @@ var CameraMod = {
     }).then(function(stream){
       CameraMod.stream = stream;
       video.srcObject = stream;
+      var track = stream.getVideoTracks()[0];
+      CameraMod.track = track;
+      CameraMod.setupTrackFeatures(track);
     })['catch'](function(err){
       toast('No se pudo abrir la cámara. Revisá los permisos del navegador.');
       CameraMod.cancel();
     });
+  },
+
+  /* Enfoque continuo (si el navegador lo permite) + detección de zoom óptico/digital
+     disponible en la cámara del celular. Todo con "mejor esfuerzo": si el navegador
+     no lo soporta, simplemente no aparece el control, sin romper nada. */
+  setupTrackFeatures: function(track){
+    var capabilities = null;
+    try {
+      if (typeof track.getCapabilities === 'function') capabilities = track.getCapabilities();
+    } catch(e){}
+
+    try {
+      if (capabilities && capabilities.focusMode && capabilities.focusMode.indexOf('continuous') >= 0){
+        track.applyConstraints({advanced:[{focusMode:'continuous'}]});
+      }
+    } catch(e){}
+
+    var zoomRow = document.getElementById('cameraZoomRow');
+    var slider = document.getElementById('cameraZoomSlider');
+    if (!zoomRow || !slider) return;
+    if (capabilities && capabilities.zoom && capabilities.zoom.max > capabilities.zoom.min){
+      slider.min = capabilities.zoom.min;
+      slider.max = capabilities.zoom.max;
+      slider.step = capabilities.zoom.step || 0.1;
+      slider.value = capabilities.zoom.min;
+      zoomRow.classList.remove('hidden');
+    } else {
+      zoomRow.classList.add('hidden');
+    }
+  },
+
+  onZoomChange: function(val){
+    if (!this.track) return;
+    try { this.track.applyConstraints({advanced:[{zoom: parseFloat(val)}]}); } catch(e){}
   },
 
   stopStream: function(){
@@ -563,6 +614,7 @@ var CameraMod = {
       for (var i=0;i<tracks.length;i++){ tracks[i].stop(); }
       this.stream = null;
     }
+    this.track = null;
   },
 
   cancel: function(){
