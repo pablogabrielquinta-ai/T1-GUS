@@ -297,6 +297,11 @@ nav.bottomnav button.active{color:var(--amber);}
 .lectura-grupo-titulo:first-child{margin-top:0;}
 .lectura-multi-item .flabel{font-size:12px; margin-bottom:3px;}
 .lectura-desc{color:var(--text-dim); font-weight:400; text-transform:none; letter-spacing:0;}
+.campo-alerta{border-color:var(--red) !important; background:var(--red-tint) !important;}
+.aviso-vivo{
+  display:flex; align-items:center; gap:6px; font-size:12px; color:var(--red);
+  background:var(--red-tint); border:1px solid var(--red-dim); border-radius:9px; padding:8px 10px; margin-top:8px;
+}
 .lectura-multi-item.lectura-sap{background:var(--amber-tint); border:1px solid var(--amber-dim); border-radius:10px; padding:8px 10px;}
 .lectura-multi-item.lectura-sap .flabel{color:#a3792a; font-weight:700;}
 .lectura-multi-item input{font-size:17px; padding:11px 12px;}
@@ -737,11 +742,13 @@ var OrdMod = {
   select: function(cod){
     Detail.data.ordenativos[this.targetIdx] = cod;
     Detail.renderOrdenativos();
+    Detail.checkOrdenativoConLecturaEnVivo();
     this.closeModal();
   },
   quitar: function(){
     Detail.data.ordenativos[this.targetIdx] = '';
     Detail.renderOrdenativos();
+    Detail.checkOrdenativoConLecturaEnVivo();
     this.closeModal();
   }
 };
@@ -922,8 +929,15 @@ var TIPO_CODIGOS = {
     {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'},
     {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'},
     {c:'16.7.0',d:'Potencia activa instantánea (A+ + A-)'},{c:'13.7.0',d:'Factor de potencia total instantáneo'}
+  ],
+  'MIDDE DTS27': [
+    {c:'15.8.0',d:'Contador de energía activa total'},
+    {c:'r.8.0',d:'Contador de energía reactiva (a confirmar)'},
+    {c:'1.6.0.01',d:'Demanda máxima activa (a confirmar período)'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'}
   ]
-  /* T1, SMART, IT330, GUMA QUILMES, MIDDE DTS27, GUMA TIPOITI: un solo campo de lectura. */
+  /* T1, SMART, IT330, GUMA QUILMES, GUMA TIPOITI: un solo campo de lectura. */
 };
 TIPO_CODIGOS['IT 410'] = TIPO_CODIGOS['IT410'];
 
@@ -1113,6 +1127,19 @@ function lecturaSospechosa(lectura){
     if (/^(\d)\1+$/.test(lectura)) return 'La lectura "'+lectura+'" tiene todos los dígitos iguales.';
   }
   return null;
+}
+
+/* Códigos de banda horaria (energía activa) para el chequeo en vivo de sumas. */
+var PATRON_TOTAL = /^15\.8\.0(\.x)?$/i;
+var PATRON_PICO   = /^15\.8\.1(\.?x)?$/i;
+var PATRON_RESTO  = /^15\.8\.2(\.?x)?$/i;
+var PATRON_VALLE  = /^15\.8\.3(\.?x)?$/i;
+
+function parseNumeroLectura(str){
+  if (str == null || str === '') return null;
+  var s = String(str).trim().replace(/\./g,'').replace(',', '.');
+  var n = parseFloat(s);
+  return isNaN(n) ? null : n;
 }
 
 /* ---------------- IndexedDB ---------------- */
@@ -1667,20 +1694,24 @@ var Detail = {
           var val = this.data.lecturaCodigos[cod] || '';
           var esUltimo = (flatIdx === totalCampos - 1);
           lecturaFieldsHtml +=
-            '<div class="lectura-multi-item'+(esSap?' lectura-sap':'')+'">' +
+            '<div class="lectura-multi-item'+(esSap?' lectura-sap':'')+'" id="fila-'+escAttr(cod)+'">' +
               '<label class="flabel">'+(esSap?'⭐ ':'')+escHtml(cod)+(item.d ? ' <span class="lectura-desc">— '+escHtml(item.d)+'</span>' : '')+'</label>' +
               '<input type="text" inputmode="decimal" enterkeyhint="'+(esUltimo?'done':'next')+'" ' +
                 'class="fLecturaCod" data-cod="'+escAttr(cod)+'" value="'+escAttr(val)+'" ' +
-                'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); Detail.focusNextLecturaField(this);}">' +
+                'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); Detail.focusNextLecturaField(this);}" ' +
+                'oninput="Detail.checkSumaBandasEnVivo()">' +
             '</div>';
           flatIdx++;
         }
       }
       lecturaFieldsHtml += '</div>';
+      lecturaFieldsHtml += '<div id="avisoSumaBandas"></div>';
     } else {
       lecturaFieldsHtml =
         '<label class="flabel">Lectura del medidor</label>' +
-        '<input type="text" id="fLectura" placeholder="Ej: 004521 o A0452" value="'+escAttr(this.data.lectura)+'">';
+        '<input type="text" id="fLectura" placeholder="Ej: 004521 o A0452" value="'+escAttr(this.data.lectura)+'" ' +
+          'oninput="Detail.checkLecturaSospechosaEnVivo()">' +
+        '<div id="avisoLecturaSospechosa"></div>';
     }
 
     var html =
@@ -1710,6 +1741,7 @@ var Detail = {
     '<fieldset><legend>Novedades (ordenativos)</legend>' +
       '<div class="ord-boxes" id="ordBoxes"></div>' +
       '<div class="ord-preview" id="ordPreview"></div>' +
+      '<div id="avisoOrdenativoConflicto"></div>' +
     '</fieldset>' +
 
     '<fieldset><legend>Cambio de medidor</legend>' +
@@ -1737,6 +1769,8 @@ var Detail = {
     this.renderFoto();
     this.updateGpsUI();
     this.captureGpsSilently();
+    if (this.codigos && this.codigos.length) this.checkSumaBandasEnVivo();
+    else this.checkLecturaSospechosaEnVivo();
   },
 
   renderFoto: function(){
@@ -1777,6 +1811,60 @@ var Detail = {
     var chk = document.getElementById('fCambio').checked;
     this.data.cambioMedidor = chk;
     document.getElementById('cambioBlock').classList.toggle('hidden', !chk);
+  },
+
+  /* Validación en vivo: lectura simple con dígitos repetidos o muy corta. */
+  checkLecturaSospechosaEnVivo: function(){
+    var input = document.getElementById('fLectura');
+    var aviso = document.getElementById('avisoLecturaSospechosa');
+    if (!input || !aviso) return;
+    var msg = lecturaSospechosa(input.value.trim());
+    input.classList.toggle('campo-alerta', !!msg);
+    aviso.innerHTML = msg ? '<div class="aviso-vivo">⚠️ '+escHtml(msg)+' ¿Es correcta?</div>' : '';
+    this.checkOrdenativoConLecturaEnVivo();
+  },
+
+  /* Validación en vivo: Pico + Resto + Valle debería dar ≈ Total (medidores multi-registro). */
+  checkSumaBandasEnVivo: function(){
+    var aviso = document.getElementById('avisoSumaBandas');
+    if (!aviso) return;
+    var inputs = document.querySelectorAll('.fLecturaCod');
+    var total=null, pico=null, resto=null, valle=null;
+    var filaTotal=null, filaPico=null, filaResto=null, filaValle=null;
+    for (var i=0;i<inputs.length;i++){
+      var cod = inputs[i].getAttribute('data-cod');
+      var val = parseNumeroLectura(inputs[i].value);
+      var fila = document.getElementById('fila-'+cod);
+      if (val==null){ if(fila) fila.classList.remove('campo-alerta'); continue; }
+      if (PATRON_TOTAL.test(cod)){ total = val; filaTotal = fila; }
+      else if (PATRON_PICO.test(cod)){ pico = val; filaPico = fila; }
+      else if (PATRON_RESTO.test(cod)){ resto = val; filaResto = fila; }
+      else if (PATRON_VALLE.test(cod)){ valle = val; filaValle = fila; }
+    }
+    [filaTotal,filaPico,filaResto,filaValle].forEach(function(f){ if (f) f.classList.remove('campo-alerta'); });
+    if (total!=null && pico!=null && resto!=null && valle!=null){
+      var suma = pico+resto+valle;
+      if (Math.abs(suma-total) > Math.max(1, total*0.01)){
+        [filaTotal,filaPico,filaResto,filaValle].forEach(function(f){ if (f) f.classList.add('campo-alerta'); });
+        aviso.innerHTML = '<div class="aviso-vivo">⚠️ Pico + Resto + Valle = '+suma+', pero el Total dice '+total+'. Revisá estos 4 campos.</div>';
+        this.checkOrdenativoConLecturaEnVivo();
+        return;
+      }
+    }
+    aviso.innerHTML = '';
+    this.checkOrdenativoConLecturaEnVivo();
+  },
+
+  /* Validación en vivo: ordenativo de "sin acceso" cargado junto con una lectura. */
+  checkOrdenativoConLecturaEnVivo: function(){
+    var aviso = document.getElementById('avisoOrdenativoConflicto');
+    if (!aviso) return;
+    var tieneLectura = !!(document.getElementById('fLectura') && document.getElementById('fLectura').value.trim()) ||
+      Array.prototype.some.call(document.querySelectorAll('.fLecturaCod'), function(i){ return i.value.trim(); });
+    var hayConflicto = this.data.ordenativos.some(function(c){ return c && CODIGOS_SIN_ACCESO.indexOf(c) >= 0; });
+    aviso.innerHTML = (tieneLectura && hayConflicto)
+      ? '<div class="aviso-vivo">⚠️ Cargaste una lectura y también un ordenativo de "sin acceso / no se encontró el medidor". Revisá si corresponde.</div>'
+      : '';
   },
 
   /* Al tocar "siguiente" en el teclado de un campo de lectura múltiple,
