@@ -288,6 +288,19 @@ nav.bottomnav button.active{color:var(--amber);}
 }
 .agente-current b{color:var(--amber);}
 
+/* ---- lectura multi-registro ---- */
+.lectura-multi{display:flex; flex-direction:column; gap:8px;}
+.lectura-grupo-titulo{
+  font-size:11px; font-weight:700; color:var(--amber); text-transform:uppercase; letter-spacing:.4px;
+  margin:12px 0 2px;
+}
+.lectura-grupo-titulo:first-child{margin-top:0;}
+.lectura-multi-item .flabel{font-size:12px; margin-bottom:3px;}
+.lectura-desc{color:var(--text-dim); font-weight:400; text-transform:none; letter-spacing:0;}
+.lectura-multi-item.lectura-sap{background:var(--amber-tint); border:1px solid var(--amber-dim); border-radius:10px; padding:8px 10px;}
+.lectura-multi-item.lectura-sap .flabel{color:#a3792a; font-weight:700;}
+.lectura-multi-item input{font-size:17px; padding:11px 12px;}
+
 /* ---- ordenativos ---- */
 .ord-boxes{display:flex; gap:10px; flex-wrap:wrap;}
 .ord-box{
@@ -317,6 +330,21 @@ nav.bottomnav button.active{color:var(--amber);}
 .ord-item .o-cod{color:var(--amber); font-weight:700; min-width:26px; flex-shrink:0;}
 .ord-item .o-desc{flex:1; font-size:12.5px;}
 .ord-item .o-check{color:var(--green); flex-shrink:0;}
+
+/* ---- mi ruta ---- */
+.ruta-progreso{text-align:center; padding:18px 0 6px;}
+.ruta-progreso-num{font-size:34px; font-weight:700; color:var(--text);}
+.ruta-progreso-label{font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin-top:2px;}
+.ruta-proximo{
+  background:var(--amber-tint); border:1px solid var(--amber-dim); border-radius:16px;
+  padding:20px; text-align:center; margin:14px 0;
+}
+.ruta-proximo-label{font-size:11px; font-weight:700; color:#a3792a; text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px;}
+.ruta-proximo-dir{font-size:20px; font-weight:700; color:var(--text);}
+.ruta-proximo-sub{font-size:12.5px; color:var(--text-dim); margin-top:3px;}
+.ruta-proximo-listo{background:var(--green-tint); border-color:var(--green-dim);}
+.ruta-acciones{display:flex; justify-content:center; gap:22px; margin-top:20px;}
+.ruta-acciones span{font-size:12.5px; color:var(--text-dim); cursor:pointer;}
 
 /* ---- mapa ---- */
 .map-legend{display:flex; gap:14px; flex-wrap:wrap; margin:10px 0; font-size:12px; color:var(--text-dim);}
@@ -366,6 +394,9 @@ nav.bottomnav button.active{color:var(--amber);}
       <div class="zona-list" id="zonaList"></div>
     </div>
   </section>
+
+  <!-- PANTALLA: MI RUTA (resumen simple de la zona + próximo pendiente) -->
+  <section class="screen" id="screen-ruta"></section>
 
   <!-- PANTALLA: LISTA DE ZONA -->
   <section class="screen" id="screen-zona">
@@ -747,10 +778,238 @@ function padOrdenativos(list){
   return out;
 }
 
+/* Tipos de medidor que registran varios valores a la vez (multi-registro),
+   en vez de una sola "lectura". Cada array son los códigos técnicos propios
+   de ese tipo de medidor, en el orden en que hay que cargarlos. */
+/* Cada entrada es {c: código, d: descripción oficial DPEC (vacío si no confirmado)}.
+   Fuente: planilla de lecturas de abril (para los primeros 7 tipos) + material de
+   capacitación oficial "Códigos en medidores electrónicos y tomas de lectura" DPEC
+   (para las descripciones y para IT410 / Alpha II / ISKRA MT880). */
+var TIPO_CODIGOS = {
+  'Lectura Larga': [
+    {c:'0.9.1',d:'Hora actual'},{c:'0.9.2',d:'Fecha actual'},{c:'0.9.3',d:''},
+    {c:'15.8.0',d:'Contador de energía activa total'},
+    {c:'15.8.1',d:'Energía activa banda horaria Pico'},{c:'15.8.2',d:'Energía activa banda horaria Resto'},{c:'15.8.3',d:'Energía activa banda horaria Valle'},
+    {c:'15.8.0.x',d:'Energía activa total — período anterior'},
+    {c:'15.8.1.x',d:'Energía activa Pico — período anterior'},{c:'15.8.2.x',d:'Energía activa Resto — período anterior'},{c:'15.8.3.x',d:'Energía activa Valle — período anterior'},
+    {c:'15.6.1',d:'Demanda máxima Pico — mes en curso'},{c:'15.6.2',d:'Demanda máxima Resto — mes en curso'},{c:'15.6.3',d:'Demanda máxima Valle — mes en curso'},
+    {c:'15.6.1.x',d:'Demanda máxima Pico — período anterior'},{c:'15.6.2.x',d:'Demanda máxima Resto — período anterior'},{c:'15.6.3.x',d:'Demanda máxima Valle — período anterior'},
+    {c:'15.2.1',d:'Demanda acumulada Pico'},{c:'15.2.2',d:'Demanda acumulada Resto'},{c:'15.2.3',d:'Demanda acumulada Valle'},
+    {c:'5.8.0',d:'Contador de energía reactiva (cuadrante 1)'},{c:'5.8.1',d:''},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'}
+  ],
+  'MT174': [
+    {c:'15.8.0',d:'Contador de energía activa total'},{c:'5.8.0',d:'Contador de energía reactiva total'},
+    {c:'15.6.0',d:'Demanda máxima activa total'},{c:'15.2.0',d:'Demanda acumulada activa total'},
+    {c:'0.9.4',d:'Fecha y hora'},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'}
+  ],
+  'Ampy/Landys': [
+    {c:'0.1.0',d:'Número de resets'},{c:'15.8.0',d:'Contador de energía activa'},{c:'3.8.0',d:'Contador de energía reactiva'},
+    {c:'15.6.0',d:'Demanda máxima'},{c:'1.2.0',d:'Demanda acumulada'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'}
+  ],
+  'Landys E330': [
+    {c:'Fecha Med',d:'Fecha'},{c:'Hora Med',d:'Hora'},{c:'0.1.0',d:'Número de resets'},
+    {c:'15.8.0',d:'Contador de energía activa'},{c:'3.8.0',d:'Contador de energía reactiva'},
+    {c:'15.6.0',d:'Máxima demanda total (con fecha y hora)'},{c:'1.2.0',d:'Demanda acumulada total (con fecha y hora)'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'},
+    {c:'P.F',d:'Factor de potencia total'}
+  ],
+  'Prosumidor': [
+    {c:'0.9.1',d:'Hora actual'},{c:'0.9.2',d:'Fecha actual'},{c:'0.9.3',d:''},
+    {c:'15.8.0',d:'Contador de energía activa total'},
+    {c:'15.8.1',d:'Energía activa banda horaria Pico'},{c:'15.8.2',d:'Energía activa banda horaria Resto'},{c:'15.8.3',d:'Energía activa banda horaria Valle'},
+    {c:'15.8.0.x',d:'Energía activa total — período anterior'},
+    {c:'15.8.1.x',d:'Energía activa Pico — período anterior'},{c:'15.8.2.x',d:'Energía activa Resto — período anterior'},{c:'15.8.3.x',d:'Energía activa Valle — período anterior'},
+    {c:'25',d:''},
+    {c:'15.6.1',d:'Demanda máxima Pico — mes en curso'},{c:'15.6.2',d:'Demanda máxima Resto — mes en curso'},{c:'15.6.3',d:'Demanda máxima Valle — mes en curso'},
+    {c:'15.6.1.x',d:'Demanda máxima Pico — período anterior'},{c:'15.6.2.x',d:'Demanda máxima Resto — período anterior'},{c:'15.6.3.x',d:'Demanda máxima Valle — período anterior'},
+    {c:'15.2.1',d:'Demanda acumulada Pico'},{c:'15.2.2',d:'Demanda acumulada Resto'},{c:'15.2.3',d:'Demanda acumulada Valle'},
+    {c:'5.8.0',d:'Contador de energía reactiva (cuadrante 1)'},{c:'5.8.1',d:''},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'}
+  ],
+  'Lectura Larga Invertida': [
+    {c:'0.9.1',d:'Hora actual'},{c:'0.9.2',d:'Fecha actual'},{c:'0.9.3',d:''},
+    {c:'15.8.0',d:'Contador de energía activa total'},{c:'15.8.0x',d:'Energía activa total — período anterior'},
+    {c:'15.8.1',d:'Energía activa banda horaria Pico'},{c:'15.8.1x',d:'Energía activa Pico — período anterior'},
+    {c:'15.8.2',d:'Energía activa banda horaria Resto'},{c:'15.8.2x',d:'Energía activa Resto — período anterior'},
+    {c:'15.8.3',d:'Energía activa banda horaria Valle'},{c:'15.8.3.x',d:'Energía activa Valle — período anterior'},
+    {c:'15.6.1',d:'Demanda máxima Pico — mes en curso'},{c:'15.6.1x',d:'Demanda máxima Pico — período anterior'},
+    {c:'15.6.2',d:'Demanda máxima Resto — mes en curso'},{c:'15.6.2x',d:'Demanda máxima Resto — período anterior'},
+    {c:'15.6.3',d:'Demanda máxima Valle — mes en curso'},{c:'15.6.3.x',d:'Demanda máxima Valle — período anterior'},
+    {c:'15.2.1',d:'Demanda acumulada Pico'},{c:'15.2.2',d:'Demanda acumulada Resto'},{c:'15.2.3',d:'Demanda acumulada Valle'},
+    {c:'5.8.0',d:'Contador de energía reactiva (cuadrante 1)'},{c:'5.8.1',d:''},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'}
+  ],
+  'Elster A1052': [
+    {c:'9241 -KWH',d:'Contador de energía activa (a confirmar)'},
+    {c:'3464-KVARH',d:'Contador de energía reactiva (a confirmar)'},
+    {c:'33(N MED)',d:'Número de medidor / serie'},
+    {c:'A',d:'Corriente o tensión — fase A (a confirmar)'},
+    {c:'B',d:'Corriente o tensión — fase B (a confirmar)'},
+    {c:'C',d:'Corriente o tensión — fase C (a confirmar)'}
+  ],
+  'IT410': [
+    {c:'0.9.2',d:'Fecha'},{c:'0.9.1',d:'Hora'},{c:'96.15.9',d:'Número de resets'},
+    {c:'15.8.0',d:'Contador de energía activa total'},{c:'15.8.0.1',d:'Energía activa total — cierre período anterior'},
+    {c:'1.6.0',d:'Demanda máxima activa positiva — período actual'},{c:'1.6.0.1',d:'Demanda máxima activa positiva — período anterior'},
+    {c:'5.8.0',d:'Contador de energía reactiva Q1'},{c:'5.8.0.1',d:'Energía reactiva Q1 — cierre período anterior'}
+  ],
+  'IT410 - PROSUMIDOR': [
+    {c:'0.9.2',d:'Fecha'},{c:'0.9.1',d:'Hora'},{c:'C.15.9',d:'Número de resets'},
+    {c:'15.8.0',d:'Contador de energía activa total'},{c:'15.8.0.1',d:'Energía activa total — cierre período anterior'},
+    {c:'1.6.0',d:'Demanda máxima activa positiva — período actual'},{c:'1.6.0.1',d:'Demanda máxima activa positiva — período anterior'},
+    {c:'5.8.0',d:'Contador de energía reactiva Q1'},{c:'5.8.0.1',d:'Energía reactiva Q1 — cierre período anterior'},
+    {c:'1.8.0',d:'Energía activa consumida total'},{c:'1.8.0.1',d:'Energía activa consumida — cierre período anterior'},
+    {c:'2.8.0',d:'Energía activa inyectada total'},{c:'2.8.0.1',d:'Energía activa inyectada — cierre período anterior'},
+    {c:'1.2.0',d:'Demanda acumulada total'},{c:'1.2.0.1',d:'Demanda acumulada — cierre período anterior'}
+  ],
+  'Alpha II': [
+    {c:'1',d:'Fecha'},{c:'2',d:'Hora'},{c:'3',d:'Número de resets'},
+    {c:'10',d:'Contador de energía activa total (kWh)'},
+    {c:'11',d:'Energía activa banda Pico (kWh)'},{c:'12',d:'Energía activa banda Resto (kWh)'},{c:'13',d:'Energía activa banda Valle (kWh)'},
+    {c:'20',d:'Energía activa total — período anterior'},
+    {c:'21',d:'Energía activa Pico — período anterior'},{c:'22',d:'Energía activa Resto — período anterior'},{c:'23',d:'Energía activa Valle — período anterior'},
+    {c:'31',d:'Demanda máxima Pico — mes en curso (kW)'},{c:'32',d:'Demanda máxima Resto — mes en curso (kW)'},{c:'33',d:'Demanda máxima Valle — mes en curso (kW)'},
+    {c:'41',d:'Demanda máxima Pico — período anterior'},{c:'42',d:'Demanda máxima Resto — período anterior'},{c:'43',d:'Demanda máxima Valle — período anterior'},
+    {c:'51',d:'Demanda acumulada Pico (kW)'},{c:'52',d:'Demanda acumulada Resto (kW)'},{c:'53',d:'Demanda acumulada Valle (kW)'},
+    {c:'60',d:'Contador de energía reactiva total (kVARh)'},{c:'70',d:'Energía reactiva total — período anterior'},
+    {c:'phA',d:'Tensión instantánea fase A (V)'},{c:'phB',d:'Tensión instantánea fase B (V)'},{c:'phC',d:'Tensión instantánea fase C (V)'},
+    {c:'IphA',d:'Corriente instantánea fase A'},{c:'IphB',d:'Corriente instantánea fase B'},{c:'IphC',d:'Corriente instantánea fase C'},
+    {c:'angA',d:'Ángulo entre V e I — fase A'},{c:'angB',d:'Ángulo entre V e I — fase B'},{c:'angC',d:'Ángulo entre V e I — fase C'},
+    {c:'SYS-kW',d:'Potencia activa instantánea'},{c:'SYS-PF',d:'Factor de potencia total instantáneo'}
+  ],
+  'ALPHA II - Prosumidor': [
+    {c:'1',d:'Fecha'},{c:'2',d:'Hora'},{c:'3',d:'Número de resets'},
+    {c:'10',d:'Energía activa consumida total (kWh)'},
+    {c:'11',d:'Energía activa consumida Pico (kWh)'},{c:'12',d:'Energía activa consumida Resto (kWh)'},{c:'13',d:'Energía activa consumida Valle (kWh)'},
+    {c:'15',d:'Energía activa inyectada total (kWh)'},
+    {c:'16',d:'Energía activa inyectada Pico (kWh)'},{c:'17',d:'Energía activa inyectada Resto (kWh)'},{c:'18',d:'Energía activa inyectada Valle (kWh)'},
+    {c:'20',d:'Energía activa consumida total — período anterior'},
+    {c:'21',d:'Energía activa consumida Pico — período anterior'},{c:'22',d:'Energía activa consumida Resto — período anterior'},{c:'23',d:'Energía activa consumida Valle — período anterior'},
+    {c:'25',d:'Energía activa inyectada total — período anterior'},
+    {c:'26',d:'Energía activa inyectada Pico — período anterior'},{c:'27',d:'Energía activa inyectada Resto — período anterior'},{c:'28',d:'Energía activa inyectada Valle — período anterior'},
+    {c:'31',d:'Demanda máxima consumida Pico — mes en curso'},{c:'32',d:'Demanda máxima consumida Resto — mes en curso'},{c:'33',d:'Demanda máxima consumida Valle — mes en curso'},
+    {c:'36',d:'Demanda máxima inyectada Pico — mes en curso'},{c:'37',d:'Demanda máxima inyectada Resto — mes en curso'},{c:'38',d:'Demanda máxima inyectada Valle — mes en curso'},
+    {c:'41',d:'Demanda máxima consumida Pico — período anterior'},{c:'42',d:'Demanda máxima consumida Resto — período anterior'},{c:'43',d:'Demanda máxima consumida Valle — período anterior'},
+    {c:'46',d:'Demanda máxima inyectada Pico — período anterior'},{c:'47',d:'Demanda máxima inyectada Resto — período anterior'},{c:'48',d:'Demanda máxima inyectada Valle — período anterior'},
+    {c:'51',d:'Demanda acumulada consumida Pico'},{c:'52',d:'Demanda acumulada consumida Resto'},{c:'53',d:'Demanda acumulada consumida Valle'},
+    {c:'56',d:'Demanda acumulada inyectada Pico'},{c:'57',d:'Demanda acumulada inyectada Resto'},{c:'58',d:'Demanda acumulada inyectada Valle'},
+    {c:'60',d:'Energía reactiva consumida total (kVARh)'},{c:'65',d:'Energía reactiva inyectada total (kVARh)'},
+    {c:'70',d:'Energía reactiva consumida total — período anterior'},{c:'75',d:'Energía reactiva inyectada total — período anterior'},
+    {c:'phA',d:'Tensión instantánea fase A (V)'},{c:'phB',d:'Tensión instantánea fase B (V)'},{c:'phC',d:'Tensión instantánea fase C (V)'},
+    {c:'IphA',d:'Corriente instantánea fase A'},{c:'IphB',d:'Corriente instantánea fase B'},{c:'IphC',d:'Corriente instantánea fase C'},
+    {c:'angA',d:'Ángulo entre V e I — fase A'},{c:'angB',d:'Ángulo entre V e I — fase B'},{c:'angC',d:'Ángulo entre V e I — fase C'},
+    {c:'SYS-kW',d:'Potencia activa instantánea'},{c:'SYS-PF',d:'Factor de potencia total instantáneo'}
+  ],
+  'ISKRA MT880': [
+    {c:'0.9.2',d:'Fecha'},{c:'0.9.1',d:'Hora'},{c:'0.1.0',d:'Número de resets'},
+    {c:'15.8.0',d:'Contador de energía activa total'},{c:'15.8.0.01',d:'Energía activa total — período anterior'},
+    {c:'15.8.1',d:'Energía activa banda Pico'},{c:'15.8.1.01',d:'Energía activa Pico — período anterior'},
+    {c:'15.8.2',d:'Energía activa banda Resto'},{c:'15.8.2.01',d:'Energía activa Resto — período anterior'},
+    {c:'15.8.3',d:'Energía activa banda Valle'},{c:'15.8.3.01',d:'Energía activa Valle — período anterior'},
+    {c:'15.6.1',d:'Demanda máxima Pico — mes en curso'},{c:'15.6.1.01',d:'Demanda máxima Pico — período anterior'},
+    {c:'15.6.2',d:'Demanda máxima Resto — mes en curso'},{c:'15.6.2.01',d:'Demanda máxima Resto — período anterior'},
+    {c:'15.6.3',d:'Demanda máxima Valle — mes en curso'},{c:'15.6.3.01',d:'Demanda máxima Valle — período anterior'},
+    {c:'15.2.1',d:'Demanda acumulada Pico'},{c:'15.2.2',d:'Demanda acumulada Resto'},{c:'15.2.3',d:'Demanda acumulada Valle'},
+    {c:'5.8.0',d:'Contador de energía reactiva total'},{c:'5.8.0.01',d:'Energía reactiva total — período anterior'},
+    {c:'32.7.0',d:'Tensión instantánea fase 1'},{c:'52.7.0',d:'Tensión instantánea fase 2'},{c:'72.7.0',d:'Tensión instantánea fase 3'},
+    {c:'31.7.0',d:'Corriente instantánea fase 1'},{c:'51.7.0',d:'Corriente instantánea fase 2'},{c:'71.7.0',d:'Corriente instantánea fase 3'},
+    {c:'16.7.0',d:'Potencia activa instantánea (A+ + A-)'},{c:'13.7.0',d:'Factor de potencia total instantáneo'}
+  ]
+  /* T1, SMART, IT330, GUMA QUILMES, MIDDE DTS27, GUMA TIPOITI: un solo campo de lectura. */
+};
+TIPO_CODIGOS['IT 410'] = TIPO_CODIGOS['IT410'];
+
+/* Agrupa los campos de un tipo de medidor en secciones, según el patrón del código
+   (ya con las descripciones oficiales de DPEC cargadas arriba, cuando se conocen).
+   Devuelve [{titulo, items:[{c,d}, ...]}]. */
+/* Campos que, según la Parte 4 del material de capacitación DPEC ("Carga de
+   valores en SAP"), son los que efectivamente se cargan al sistema de
+   facturación — se resaltan para que el lecturista les preste más atención.
+   Es un mapeo por coincidencia de código entre esa sección y los campos que
+   ya leemos de cada tipo de medidor; donde no hubo una coincidencia clara
+   (Prosumidor, Elster A1052, IT410 básico) se dejó sin marcar en vez de
+   adivinar. Si algo no correspondiera, se puede ajustar. */
+var SAP_IMPORTANTE = {
+  'MT174': ['15.8.0','5.8.0','15.2.0'],
+  'Lectura Larga': ['15.8.1.x','15.8.2.x','15.8.3.x','15.2.1','15.2.2','15.2.3'],
+  'Lectura Larga Invertida': ['15.8.1x','15.8.2x','15.8.3.x','15.2.1','15.2.2','15.2.3'],
+  'IT410 - PROSUMIDOR': ['1.8.0.1','2.8.0.1','1.2.0.1','5.8.0.1']
+};
+
+var ORDEN_GRUPOS_LECTURA = ['Fecha y hora','Energía activa','Energía reactiva','Demanda / potencia','Corriente (fases)','Tensión (fases)','Fases','Otros'];
+function grupoDeCodigoLectura(cod){
+  var c = cod.toLowerCase().replace(/\s+/g,'');
+  if (c.indexOf('fecha')>=0 || c.indexOf('hora')>=0 || c==='0.9.1' || c==='0.9.2' || c==='1' || c==='2') return 'Fecha y hora';
+  if (c.indexOf('15.8')===0 || c.indexOf('1.8')===0 || c.indexOf('2.8')===0 || c.indexOf('9241')>=0 || c.indexOf('kwh')>=0 || /^1[0-3]$/.test(c) || /^1[5-8]$/.test(c) || /^2[0-8]$/.test(c)) return 'Energía activa';
+  if (c.indexOf('5.8')===0 || c.indexOf('3.8')===0 || c.indexOf('3464')>=0 || c.indexOf('kvarh')>=0 || c==='60' || c==='65' || c==='70' || c==='75') return 'Energía reactiva';
+  if (c.indexOf('15.6')===0 || c.indexOf('15.2')===0 || c.indexOf('1.6')===0 || c.indexOf('1.2')===0 || /^[3-5][1-8]$/.test(c)) return 'Demanda / potencia';
+  if (c.indexOf('31.7')===0 || c.indexOf('51.7')===0 || c.indexOf('71.7')===0 || c.indexOf('iph')===0) return 'Corriente (fases)';
+  if (c.indexOf('32.7')===0 || c.indexOf('52.7')===0 || c.indexOf('72.7')===0 || c.indexOf('pha')===0 || c.indexOf('phb')===0 || c.indexOf('phc')===0) return 'Tensión (fases)';
+  if (c==='a' || c==='b' || c==='c' || c.indexOf('ang')===0) return 'Fases';
+  return 'Otros';
+}
+function agruparCodigosLectura(items){
+  var buckets = {};
+  for (var i=0;i<items.length;i++){
+    var g = grupoDeCodigoLectura(items[i].c);
+    buckets[g] = buckets[g] || [];
+    buckets[g].push(items[i]);
+  }
+  var out = [];
+  for (var j=0;j<ORDEN_GRUPOS_LECTURA.length;j++){
+    var nombre = ORDEN_GRUPOS_LECTURA[j];
+    if (buckets[nombre] && buckets[nombre].length) out.push({titulo:nombre, items:buckets[nombre]});
+  }
+  return out;
+}
+
+/* Copia superficial de un objeto plano (para no mutar el registro guardado al editar). */
+function shallowClone(obj){
+  var out = {};
+  for (var k in obj){ if (obj.hasOwnProperty(k)) out[k] = obj[k]; }
+  return out;
+}
+
+/* ¿Este registro ya tiene algún valor de lectura cargado?
+   Contempla tanto el campo simple (lectura) como el de varios campos (lecturaCodigos). */
+function hasLecturaValor(r){
+  if (!r) return false;
+  if (r.lectura) return true;
+  if (r.lecturaCodigos){
+    for (var k in r.lecturaCodigos){
+      if (r.lecturaCodigos.hasOwnProperty(k) && r.lecturaCodigos[k]) return true;
+    }
+  }
+  return false;
+}
+
+/* Texto resumido de la lectura para listas/CSV/PDF: el valor simple,
+   o "código=valor; código=valor..." cuando el medidor es multi-registro. */
+function lecturaResumen(r){
+  if (!r) return '';
+  if (r.lectura) return r.lectura;
+  if (r.lecturaCodigos){
+    var partes = [];
+    for (var k in r.lecturaCodigos){
+      if (r.lecturaCodigos.hasOwnProperty(k) && r.lecturaCodigos[k]) partes.push(k+'='+r.lecturaCodigos[k]);
+    }
+    return partes.join('; ');
+  }
+  return '';
+}
+
 /* Estado derivado a partir de lectura + ordenativos cargados (ya no hay un solo "estado" fijo) */
 function derivedStatus(r){
   if (!r) return {cls:'st-pendiente', label:'Pendiente'};
-  var hasLectura = !!(r.lectura);
+  var hasLectura = hasLecturaValor(r);
   var hasOrd = !!(r.ordenativos && r.ordenativos.length);
   if (hasLectura && !hasOrd) return {cls:'st-leido', label:'Leído OK'};
   if (hasLectura && hasOrd) return {cls:'st-parcial', label:'Leído c/ novedad'};
@@ -770,6 +1029,75 @@ function computeStats(userList){
     else stats.pendiente++;
   }
   return stats;
+}
+
+/* Extrae calle + altura de una dirección de texto (no es GPS real, es una
+   aproximación por dirección: agrupa por calle y ordena por altura, para
+   evitar cruzar la zona de un lado a otro innecesariamente). Si no se puede
+   sacar un número, devuelve altura 0 y la dirección completa como "calle". */
+function parseDireccion(dir){
+  var d = (dir || '').trim();
+  var m = d.match(/(\d+)\s*(?:\/\s*\d+)?\s*$/);
+  if (m){
+    var altura = parseInt(m[1], 10);
+    var calle = d.substring(0, m.index);
+    calle = calle.replace(/N[°ºñ]\.?\s*$/i, '');
+    calle = calle.replace(/[\s.,-]+$/, '');
+    calle = calle.replace(/\s+/g, ' ').trim();
+    return {calle: calle || d, altura: altura};
+  }
+  return {calle: d, altura: 0};
+}
+
+/* Devuelve los usuarios de una zona ordenados por calle y luego por altura,
+   para caminar la zona calle por calle en vez de saltar según el orden
+   original de la planilla. */
+var ZONA_ORDENADA_CACHE = {};
+function getZonaOrdenada(zona){
+  if (ZONA_ORDENADA_CACHE[zona]) return ZONA_ORDENADA_CACHE[zona];
+  var list = USERS.filter(function(u){ return u.zona === zona; });
+  var conParse = list.map(function(u){
+    var p = parseDireccion(u.dir);
+    return {u:u, calle:p.calle, altura:p.altura};
+  });
+  conParse.sort(function(a,b){
+    if (a.calle < b.calle) return -1;
+    if (a.calle > b.calle) return 1;
+    return a.altura - b.altura;
+  });
+  var ordenada = conParse.map(function(x){ return x.u; });
+  ZONA_ORDENADA_CACHE[zona] = ordenada;
+  return ordenada;
+}
+
+/* Primer medidor pendiente (sin lectura ni ordenativos) en el orden de calle,
+   o null si no queda ninguno pendiente en esa zona. */
+function primerPendiente(zona){
+  var list = getZonaOrdenada(zona);
+  for (var i=0;i<list.length;i++){
+    var r = LECTURAS[list[i].med];
+    if (!hasLecturaValor(r) && !(r && r.ordenativos && r.ordenativos.length)) return list[i];
+  }
+  return null;
+}
+
+/* Próximo pendiente "más cercano" al medidor recién cargado: primero busca
+   hacia adelante en el orden de calle (misma dirección de recorrido), y si
+   no encuentra, da la vuelta y busca desde el principio de la zona. */
+function proximoPendienteCercano(zona, medActual){
+  var list = getZonaOrdenada(zona);
+  var idx = -1;
+  for (var i=0;i<list.length;i++){ if (list[i].med === medActual){ idx = i; break; } }
+  if (idx === -1) return primerPendiente(zona);
+  for (var j=idx+1;j<list.length;j++){
+    var r1 = LECTURAS[list[j].med];
+    if (!hasLecturaValor(r1) && !(r1 && r1.ordenativos && r1.ordenativos.length)) return list[j];
+  }
+  for (var k=0;k<idx;k++){
+    var r2 = LECTURAS[list[k].med];
+    if (!hasLecturaValor(r2) && !(r2 && r2.ordenativos && r2.ordenativos.length)) return list[k];
+  }
+  return null;
 }
 
 /* Ordenativos que indican "no se pudo acceder / no se encontró el medidor".
@@ -916,7 +1244,7 @@ var App = {
     var navHome = document.getElementById('navHome');
     var navExport = document.getElementById('navExport');
     var navMap = document.getElementById('navMap');
-    navHome.classList.toggle('active', name==='home' || name==='zona' || name==='detail');
+    navHome.classList.toggle('active', name==='home' || name==='ruta' || name==='zona' || name==='detail');
     navExport.classList.toggle('active', name==='export');
     navMap.classList.toggle('active', name==='map');
     window.scrollTo(0,0);
@@ -1001,6 +1329,8 @@ var App = {
       this.showScreen('home');
       document.getElementById('hdrTitle').textContent = 'Relevamiento GU';
       document.getElementById('hdrSub').textContent = 'DPEC · Grandes Usuarios';
+    } else if (prev === 'ruta'){
+      this.openRuta(this.currentZona, true);
     } else if (prev === 'zona'){
       this.openZona(this.currentZona, true);
     } else if (prev === 'detail'){
@@ -1029,7 +1359,7 @@ var App = {
     for (var k in LECTURAS){
       if (!LECTURAS.hasOwnProperty(k)) continue;
       var r = LECTURAS[k];
-      if ((r.lectura) || (r.ordenativos && r.ordenativos.length)) done++;
+      if (hasLecturaValor(r) || (r.ordenativos && r.ordenativos.length)) done++;
     }
     toast(done + ' de ' + total + ' relevados · datos guardados solo en este dispositivo');
   },
@@ -1057,7 +1387,7 @@ var App = {
       var st = computeStats(byZona[zn] || []);
       var done = st.ok + st.novedad + st.problema;
       var pct = st.total ? Math.round(done*100/st.total) : 0;
-      html += '<div class="zona-card" onclick="App.openZona(\''+escAttr(zn)+'\')">' +
+      html += '<div class="zona-card" onclick="App.openRuta(\''+escAttr(zn)+'\')">' +
         '<div class="zinfo">' +
           '<div class="zname">'+escHtml(zn)+'</div>' +
           '<div class="zbar"><div class="zbar-fill" style="width:'+pct+'%"></div></div>' +
@@ -1120,9 +1450,20 @@ var App = {
     this.showScreen('zona');
   },
 
+  /* Pantalla simplificada "Mi ruta": progreso de la zona + próximo pendiente,
+     sin tener que buscar en ninguna lista. */
+  openRuta: function(zona, isBack){
+    this.currentZona = zona;
+    if (!isBack){ this.pushNavState(); this.stack.push('ruta'); }
+    document.getElementById('hdrTitle').textContent = 'Mi ruta';
+    document.getElementById('hdrSub').textContent = zona;
+    RutaMod.render(zona);
+    this.showScreen('ruta');
+  },
+
   renderZonaList: function(q){
     var zona = this.currentZona;
-    var list = USERS.filter(function(u){ return u.zona === zona; });
+    var list = getZonaOrdenada(zona);
     var st = computeStats(list);
     var total = st.total, done = st.ok + st.novedad + st.problema;
     var pct = total ? Math.round(done*100/total) : 0;
@@ -1150,7 +1491,7 @@ var App = {
     if (filtro !== 'todos'){
       list = list.filter(function(u){
         var r = LECTURAS[u.med];
-        var hasLectura = !!(r && r.lectura);
+        var hasLectura = hasLecturaValor(r);
         var hasOrd = !!(r && r.ordenativos && r.ordenativos.length);
         if (filtro === 'pendientes') return !hasLectura && !hasOrd;
         if (filtro === 'relevados') return hasLectura || hasOrd;
@@ -1207,10 +1548,10 @@ var App = {
     this.showScreen('detail');
   },
 
-  /* Lista de N° de medidor de una zona, en el mismo orden que se muestran
-     en pantalla — usada para "Anterior/Siguiente" y "Guardar y siguiente". */
+  /* Lista de N° de medidor de una zona, ordenada por calle y altura
+     (no por el orden original de la planilla) — usada para "Anterior/Siguiente". */
   getZonaMedList: function(zona){
-    return USERS.filter(function(u){ return u.zona === zona; }).map(function(u){ return u.med; });
+    return getZonaOrdenada(zona).map(function(u){ return u.med; });
   },
 
   renderExport: function(){
@@ -1218,7 +1559,7 @@ var App = {
     for (var k in LECTURAS){
       if (!LECTURAS.hasOwnProperty(k)) continue;
       var r = LECTURAS[k];
-      if ((r.lectura) || (r.ordenativos && r.ordenativos.length)) done++;
+      if (hasLecturaValor(r) || (r.ordenativos && r.ordenativos.length)) done++;
     }
     var html =
       '<div class="detail-head">' +
@@ -1291,9 +1632,11 @@ var Detail = {
     var u = USERS_BY_MED[med];
     var saved = LECTURAS[med] || {};
     this.med = med;
+    this.codigos = TIPO_CODIGOS[u.tipo] || null;
     this.data = {
       med: med,
       lectura: saved.lectura || '',
+      lecturaCodigos: saved.lecturaCodigos ? shallowClone(saved.lecturaCodigos) : {},
       ordenativos: padOrdenativos(saved.ordenativos),
       fotoMedidor: saved.fotoMedidor || null,
       obs: saved.obs || '',
@@ -1304,6 +1647,41 @@ var Detail = {
       gpsAt: saved.gpsAt || null,
       timestamp: saved.timestamp || null
     };
+
+    var lecturaFieldsHtml;
+    if (this.codigos && this.codigos.length){
+      var grupos = agruparCodigosLectura(this.codigos);
+      var flatIdx = 0;
+      var totalCampos = this.codigos.length;
+      var sapSet = SAP_IMPORTANTE[u.tipo] || null;
+      lecturaFieldsHtml =
+        '<div class="dh-row" style="margin:0 0 8px">Este medidor ('+escHtml(u.tipo)+') tiene '+totalCampos+' campos de lectura.'+
+        (sapSet ? ' Los marcados ⭐ son los que se cargan en SAP para facturación.' : '')+'</div>' +
+        '<div class="lectura-multi">';
+      for (var gi=0; gi<grupos.length; gi++){
+        lecturaFieldsHtml += '<div class="lectura-grupo-titulo">'+escHtml(grupos[gi].titulo)+'</div>';
+        for (var ci=0; ci<grupos[gi].items.length; ci++){
+          var item = grupos[gi].items[ci];
+          var cod = item.c;
+          var esSap = sapSet && sapSet.indexOf(cod) >= 0;
+          var val = this.data.lecturaCodigos[cod] || '';
+          var esUltimo = (flatIdx === totalCampos - 1);
+          lecturaFieldsHtml +=
+            '<div class="lectura-multi-item'+(esSap?' lectura-sap':'')+'">' +
+              '<label class="flabel">'+(esSap?'⭐ ':'')+escHtml(cod)+(item.d ? ' <span class="lectura-desc">— '+escHtml(item.d)+'</span>' : '')+'</label>' +
+              '<input type="text" inputmode="decimal" enterkeyhint="'+(esUltimo?'done':'next')+'" ' +
+                'class="fLecturaCod" data-cod="'+escAttr(cod)+'" value="'+escAttr(val)+'" ' +
+                'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); Detail.focusNextLecturaField(this);}">' +
+            '</div>';
+          flatIdx++;
+        }
+      }
+      lecturaFieldsHtml += '</div>';
+    } else {
+      lecturaFieldsHtml =
+        '<label class="flabel">Lectura del medidor</label>' +
+        '<input type="text" id="fLectura" placeholder="Ej: 004521 o A0452" value="'+escAttr(this.data.lectura)+'">';
+    }
 
     var html =
     '<div class="detail-head">' +
@@ -1320,9 +1698,8 @@ var Detail = {
     '</div>' +
 
     '<fieldset><legend>Lectura</legend>' +
-      '<label class="flabel">Lectura del medidor</label>' +
-      '<input type="text" id="fLectura" placeholder="Ej: 004521 o A0452" value="'+escAttr(this.data.lectura)+'">' +
-      '<label class="flabel">Observaciones</label>' +
+      lecturaFieldsHtml +
+      '<label class="flabel" style="margin-top:10px">Observaciones</label>' +
       '<textarea id="fObs" placeholder="Notas adicionales...">'+escHtml(this.data.obs)+'</textarea>' +
     '</fieldset>' +
 
@@ -1402,6 +1779,20 @@ var Detail = {
     document.getElementById('cambioBlock').classList.toggle('hidden', !chk);
   },
 
+  /* Al tocar "siguiente" en el teclado de un campo de lectura múltiple,
+     salta directo al próximo campo (mismo orden en que se ven en pantalla). */
+  focusNextLecturaField: function(inputActual){
+    var inputs = Array.prototype.slice.call(document.querySelectorAll('.fLecturaCod'));
+    var idx = inputs.indexOf(inputActual);
+    if (idx >= 0 && idx < inputs.length - 1){
+      inputs[idx+1].focus();
+      inputs[idx+1].select();
+    } else {
+      var obs = document.getElementById('fObs');
+      if (obs) obs.focus();
+    }
+  },
+
   renderOrdenativos: function(){
     var el = document.getElementById('ordBoxes');
     if (!el) return;
@@ -1463,12 +1854,27 @@ var Detail = {
   },
 
   doSave: function(cb){
-    var lectura = document.getElementById('fLectura').value.trim();
+    var lectura = '';
+    var lecturaCodigos = {};
+    var tieneLectura = false;
+
+    if (this.codigos && this.codigos.length){
+      var inputs = document.querySelectorAll('.fLecturaCod');
+      for (var ii=0; ii<inputs.length; ii++){
+        var cod = inputs[ii].getAttribute('data-cod');
+        var val = inputs[ii].value.trim();
+        if (val){ lecturaCodigos[cod] = val; tieneLectura = true; }
+      }
+    } else {
+      lectura = document.getElementById('fLectura').value.trim();
+      tieneLectura = !!lectura;
+    }
+
     var obs = document.getElementById('fObs').value.trim();
     var medAnterior = document.getElementById('fMedAnterior') ? document.getElementById('fMedAnterior').value.trim() : '';
     var ordenativos = this.data.ordenativos.filter(function(c){ return !!c; });
 
-    if (!lectura && ordenativos.length===0){
+    if (!tieneLectura && ordenativos.length===0){
       toast('Ingresá una lectura o al menos un ordenativo');
       if (cb) cb(false);
       return;
@@ -1493,7 +1899,7 @@ var Detail = {
       return;
     }
     var hayConflictoAcceso = ordenativos.some(function(c){ return CODIGOS_SIN_ACCESO.indexOf(c) >= 0; });
-    if (lectura && hayConflictoAcceso){
+    if (tieneLectura && hayConflictoAcceso){
       if (!confirm('Cargaste una lectura y también un ordenativo de "sin acceso / no se encontró el medidor". ¿Confirmás igual?')){
         if (cb) cb(false);
         return;
@@ -1503,6 +1909,7 @@ var Detail = {
     var record = {
       med: this.med,
       lectura: lectura,
+      lecturaCodigos: lecturaCodigos,
       ordenativos: ordenativos,
       fotoMedidor: this.data.fotoMedidor,
       obs: obs,
@@ -1546,15 +1953,14 @@ var Detail = {
         App.back();
         return;
       }
-      var list = App.getZonaMedList(zona);
-      var idx = list.indexOf(self.med);
-      if (idx === -1 || idx === list.length-1){
-        toast('Guardado ✓ — era el último medidor de esta zona');
+      var siguiente = proximoPendienteCercano(zona, self.med);
+      if (!siguiente){
+        toast('Guardado ✓ — ¡no quedan pendientes en esta zona!');
         App.back();
         return;
       }
       toast('Guardado ✓ — siguiente medidor');
-      App.openDetail(list[idx+1]);
+      App.openDetail(siguiente.med);
     });
   }
 };
@@ -1573,7 +1979,7 @@ var ExportMod = {
       rows.push({
         zona: u.zona, med: u.med, nom: u.nom, us: u.us, inst: u.inst, dir: u.dir,
         tipo: u.tipo, ug: u.ug,
-        lectura: r.lectura || '', estado: st.label,
+        lectura: lecturaResumen(r), estado: st.label,
         ordenativos: ordCods, ordenativosDetalle: ordDescs,
         cambioMedidor: r.cambioMedidor ? 'SI' : 'NO',
         medidorAnterior: r.medidorAnterior || '',
@@ -1895,6 +2301,58 @@ var BackupMod = {
 };
 
 /* ---------------- Mapa del relevamiento ---------------- */
+var RutaMod = {
+  render: function(zona){
+    var ordenada = getZonaOrdenada(zona);
+    var stats = computeStats(ordenada);
+    var done = stats.ok + stats.novedad + stats.problema;
+    var total = stats.total;
+    var pct = total ? Math.round(done*100/total) : 0;
+    var proximo = primerPendiente(zona);
+
+    var proximoHtml;
+    if (proximo){
+      var p = parseDireccion(proximo.dir);
+      proximoHtml =
+        '<div class="ruta-proximo">' +
+          '<div class="ruta-proximo-label">Próximo</div>' +
+          '<div class="ruta-proximo-dir">'+escHtml(proximo.dir)+'</div>' +
+          '<div class="ruta-proximo-sub">'+escHtml(proximo.nom)+' · N° '+escHtml(proximo.med)+'</div>' +
+          '<button class="primary" style="width:100%; margin-top:12px" onclick="App.openDetail(\''+escAttr(proximo.med)+'\')">Abrir</button>' +
+        '</div>';
+    } else {
+      proximoHtml =
+        '<div class="ruta-proximo ruta-proximo-listo">' +
+          '<div class="ruta-proximo-label">🎉 Sin pendientes</div>' +
+          '<div class="ruta-proximo-sub">Ya relevaste todos los medidores de esta zona.</div>' +
+        '</div>';
+    }
+
+    var html =
+      '<div class="ruta-progreso">' +
+        '<div class="ruta-progreso-num">'+done+' / '+total+'</div>' +
+        '<div class="ruta-progreso-label">realizados · '+pct+'%</div>' +
+        '<div class="zbar" style="margin-top:8px"><div class="zbar-fill" style="width:'+pct+'%"></div></div>' +
+      '</div>' +
+      proximoHtml +
+      '<div class="ruta-acciones">' +
+        '<span onclick="RutaMod.buscar()">🔍 Buscar</span>' +
+        '<span onclick="App.openZona(App.currentZona)">📋 Ver ruta</span>' +
+        '<span onclick="App.goExport()">✅ Finalizar</span>' +
+      '</div>';
+
+    document.getElementById('screen-ruta').innerHTML = html;
+  },
+
+  buscar: function(){
+    App.goHome();
+    setTimeout(function(){
+      var input = document.getElementById('globalSearch');
+      if (input) input.focus();
+    }, 150);
+  }
+};
+
 var MapMod = {
   zonaFiltro: 'todas',
   leafletMap: null,
