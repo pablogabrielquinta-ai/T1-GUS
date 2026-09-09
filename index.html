@@ -298,6 +298,8 @@ nav.bottomnav button.active{color:var(--amber);}
 .lectura-multi-item .flabel{font-size:12px; margin-bottom:3px;}
 .lectura-desc{color:var(--text-dim); font-weight:400; text-transform:none; letter-spacing:0;}
 .campo-alerta{border-color:var(--red) !important; background:var(--red-tint) !important;}
+.lectura-multi-item.campo-alerta-anterior{border:1px solid var(--orange) !important; background:var(--orange-tint) !important;}
+.lectura-multi-item.campo-alerta-anterior .flabel{color:#a35a1c;}
 .aviso-vivo{
   display:flex; align-items:center; gap:6px; font-size:12px; color:var(--red);
   background:var(--red-tint); border:1px solid var(--red-dim); border-radius:9px; padding:8px 10px; margin-top:8px;
@@ -471,8 +473,9 @@ nav.bottomnav button.active{color:var(--amber);}
 
 <div class="modal-bg" id="agenteModal">
   <div class="modal-box">
-    <h3>Ingresar operario</h3>
-    <p class="dh-row" style="margin:0 0 4px">Ingresá tu código de agente. Queda guardado en este dispositivo y se registra en cada lectura que cargues.</p>
+    <h3>👋 Antes de arrancar</h3>
+    <p class="dh-row" style="margin:0 0 4px">Ingresá tu código de agente para identificar tus lecturas. <b>Es el mismo código con el que fichás/te identificás en prefacturación</b> — si no lo sabés, pedíselo a tu supervisor.</p>
+    <p class="dh-row" style="margin:0 0 4px">Queda guardado en este celular mientras uses la app.</p>
     <div id="agenteCurrentBox"></div>
     <label class="flabel">Código de operario</label>
     <input type="text" inputmode="numeric" id="agenteCodeInput" placeholder="Ej: 703" onkeydown="if(event.key==='Enter') AgenteMod.loginByCode()">
@@ -506,6 +509,335 @@ nav.bottomnav button.active{color:var(--amber);}
 /* =========================================================
    DPEC · Relevamiento GU — app offline (ES5, IndexedDB)
    ========================================================= */
+
+/* ===== Lector de XLSX 100% local (sin internet, sin librerías externas) ===== */
+/* Descompresor DEFLATE (RFC1951) puro en JavaScript, sin dependencias externas. */
+
+function inflateRaw(input){
+  var pos = 0;      // posición en bytes
+  var bitpos = 0;    // posición en bits dentro del byte actual (0-7)
+  var output = [];   // bytes de salida (array normal, se convierte a Uint8Array al final)
+
+  function readBit(){
+    var byte = input[pos];
+    var bit = (byte >> bitpos) & 1;
+    bitpos++;
+    if (bitpos === 8){ bitpos = 0; pos++; }
+    return bit;
+  }
+  function readBits(n){
+    var val = 0;
+    for (var i=0;i<n;i++){ val |= readBit() << i; }
+    return val;
+  }
+  function alignToByte(){
+    if (bitpos !== 0){ bitpos = 0; pos++; }
+  }
+
+  /* Construye una tabla de decodificación Huffman canónica a partir de
+     un array de longitudes de código (una por símbolo, 0 = símbolo no usado).
+     Devuelve {decode: function(readBitFn){...}} */
+  function buildHuffman(lengths){
+    var maxLen = 0;
+    for (var i=0;i<lengths.length;i++){ if (lengths[i] > maxLen) maxLen = lengths[i]; }
+    var blCount = new Array(maxLen+1).fill(0);
+    for (i=0;i<lengths.length;i++){ if (lengths[i] > 0) blCount[lengths[i]]++; }
+    var code = 0;
+    var nextCode = new Array(maxLen+1).fill(0);
+    for (var bits=1; bits<=maxLen; bits++){
+      code = (code + blCount[bits-1]) << 1;
+      nextCode[bits] = code;
+    }
+    var codes = new Array(lengths.length).fill(0);
+    for (i=0;i<lengths.length;i++){
+      var len = lengths[i];
+      if (len > 0){
+        codes[i] = nextCode[len];
+        nextCode[len]++;
+      }
+    }
+    // Mapa código(como string binaria)+longitud -> símbolo, para decodificación bit a bit
+    var map = {};
+    for (i=0;i<lengths.length;i++){
+      if (lengths[i] > 0){
+        map[lengths[i] + '_' + codes[i]] = i;
+      }
+    }
+    return function decodeOne(){
+      var c = 0, len = 0;
+      while (len < 20){ // límite de seguridad, DEFLATE no supera 15
+        c = (c << 1) | readBit();
+        len++;
+        var key = len + '_' + c;
+        if (map.hasOwnProperty(key)) return map[key];
+      }
+      throw new Error('Código Huffman inválido');
+    };
+  }
+
+  // Tablas fijas de longitud/distancia extra bits (RFC1951 3.2.5)
+  var LENGTH_BASE = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  var LENGTH_EXTRA = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  var DIST_BASE = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  var DIST_EXTRA = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  var CLEN_ORDER = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+
+  function inflateBlock(litTree, distTree){
+    while (true){
+      var sym = litTree();
+      if (sym < 256){
+        output.push(sym);
+      } else if (sym === 256){
+        return; // fin de bloque
+      } else {
+        var li = sym - 257;
+        var length = LENGTH_BASE[li] + readBits(LENGTH_EXTRA[li]);
+        var dsym = distTree();
+        var dist = DIST_BASE[dsym] + readBits(DIST_EXTRA[dsym]);
+        var start = output.length - dist;
+        for (var k=0;k<length;k++){ output.push(output[start+k]); }
+      }
+    }
+  }
+
+  var fixedLitTree = null, fixedDistTree = null;
+  function getFixedTrees(){
+    if (!fixedLitTree){
+      var litLengths = new Array(288);
+      var i;
+      for (i=0;i<=143;i++) litLengths[i]=8;
+      for (i=144;i<=255;i++) litLengths[i]=9;
+      for (i=256;i<=279;i++) litLengths[i]=7;
+      for (i=280;i<=287;i++) litLengths[i]=8;
+      fixedLitTree = buildHuffman(litLengths);
+      var distLengths = new Array(30).fill(5);
+      fixedDistTree = buildHuffman(distLengths);
+    }
+    return [fixedLitTree, fixedDistTree];
+  }
+
+  var bfinal = 0;
+  while (!bfinal){
+    bfinal = readBit();
+    var btype = readBits(2);
+    if (btype === 0){
+      alignToByte();
+      var len = input[pos] | (input[pos+1] << 8);
+      pos += 4; // len (2) + nlen (2), no verificamos nlen
+      for (var j=0;j<len;j++){ output.push(input[pos+j]); }
+      pos += len;
+    } else if (btype === 1){
+      var trees1 = getFixedTrees();
+      inflateBlock(trees1[0], trees1[1]);
+    } else if (btype === 2){
+      var hlit = readBits(5) + 257;
+      var hdist = readBits(5) + 1;
+      var hclen = readBits(4) + 4;
+      var clLengths = new Array(19).fill(0);
+      for (var c=0;c<hclen;c++){ clLengths[CLEN_ORDER[c]] = readBits(3); }
+      var clTree = buildHuffman(clLengths);
+      var allLengths = [];
+      while (allLengths.length < hlit+hdist){
+        var s = clTree();
+        if (s < 16){
+          allLengths.push(s);
+        } else if (s === 16){
+          var rep = readBits(2) + 3;
+          var prev = allLengths[allLengths.length-1];
+          for (var r=0;r<rep;r++) allLengths.push(prev);
+        } else if (s === 17){
+          var rep2 = readBits(3) + 3;
+          for (var r2=0;r2<rep2;r2++) allLengths.push(0);
+        } else if (s === 18){
+          var rep3 = readBits(7) + 11;
+          for (var r3=0;r3<rep3;r3++) allLengths.push(0);
+        }
+      }
+      var litLengths2 = allLengths.slice(0, hlit);
+      var distLengths2 = allLengths.slice(hlit, hlit+hdist);
+      var litTree2 = buildHuffman(litLengths2);
+      var distTree2 = buildHuffman(distLengths2);
+      inflateBlock(litTree2, distTree2);
+    } else {
+      throw new Error('Tipo de bloque DEFLATE inválido');
+    }
+  }
+
+  return new Uint8Array(output);
+}
+
+/* Lector de ZIP mínimo: recorre el directorio central y devuelve, para cada
+   entrada, sus bytes ya descomprimidos. Soporta método 0 (sin comprimir)
+   y método 8 (DEFLATE). Requiere inflate.js cargado antes. */
+
+function parseZip(bytes){
+  function u16(off){ return bytes[off] | (bytes[off+1] << 8); }
+  function u32(off){ return (bytes[off] | (bytes[off+1] << 8) | (bytes[off+2] << 16) | (bytes[off+3] << 24)) >>> 0; }
+
+  // Buscar el End Of Central Directory (firma PK\x05\x06), desde el final hacia atrás
+  var eocdSig = 0x06054b50;
+  var eocdPos = -1;
+  for (var i = bytes.length - 22; i >= 0; i--){
+    if (u32(i) === eocdSig){ eocdPos = i; break; }
+  }
+  if (eocdPos === -1) throw new Error('No es un archivo ZIP/XLSX válido (falta EOCD)');
+
+  var totalEntries = u16(eocdPos + 10);
+  var cdOffset = u32(eocdPos + 16);
+
+  var entries = {};
+  var pos = cdOffset;
+  for (var n = 0; n < totalEntries; n++){
+    var sig = u32(pos);
+    if (sig !== 0x02014b50) throw new Error('Directorio central de ZIP corrupto');
+    var method = u16(pos + 10);
+    var csize = u32(pos + 20);
+    var usize = u32(pos + 24);
+    var fnlen = u16(pos + 28);
+    var exlen = u16(pos + 30);
+    var cmlen = u16(pos + 32);
+    var lho = u32(pos + 42);
+    var fname = '';
+    for (var k = 0; k < fnlen; k++){ fname += String.fromCharCode(bytes[pos + 46 + k]); }
+
+    // Leer el header local (puede tener distinto largo de nombre/extra que el central)
+    var lfnlen = u16(lho + 26);
+    var lexlen = u16(lho + 28);
+    var dataStart = lho + 30 + lfnlen + lexlen;
+    var compData = bytes.subarray(dataStart, dataStart + csize);
+
+    var outBytes;
+    if (method === 0){
+      outBytes = compData;
+    } else if (method === 8){
+      outBytes = inflateRaw(compData);
+    } else {
+      outBytes = null; // método no soportado (raro en xlsx), se ignora
+    }
+    entries[fname] = outBytes;
+
+    pos += 46 + fnlen + exlen + cmlen;
+  }
+  return entries;
+}
+
+/* Convierte los bytes crudos de un .xlsx a un array de hojas [{name, aoa}],
+   donde aoa es un array de arrays (una fila por elemento), igual que
+   XLSX.utils.sheet_to_json(ws, {header:1}). Usa DOMParser nativo del
+   navegador — no depende de ninguna librería externa. */
+
+function xlsxToSheets(bytes){
+  var entries = parseZip(bytes);
+  var dec = new TextDecoder('utf-8');
+  var parser = new DOMParser();
+
+  function xmlDoc(entryName){
+    if (!entries[entryName]) return null;
+    return parser.parseFromString(dec.decode(entries[entryName]), 'application/xml');
+  }
+  function localName(el){
+    return el.localName || el.nodeName.replace(/^.*:/, '');
+  }
+  function allByLocalName(root, name){
+    var out = [];
+    var all = root.getElementsByTagName('*');
+    for (var i=0; i<all.length; i++){
+      if (localName(all[i]) === name) out.push(all[i]);
+    }
+    return out;
+  }
+  function colLetterToIndex(ref){
+    var m = /^([A-Z]+)(\d+)$/.exec(ref);
+    if (!m) return {col:0, row:0};
+    var letters = m[1], rowNum = parseInt(m[2], 10);
+    var col = 0;
+    for (var k=0; k<letters.length; k++){ col = col*26 + (letters.charCodeAt(k) - 64); }
+    return {col: col-1, row: rowNum-1};
+  }
+
+  // xl/workbook.xml → orden de hojas + su rId
+  var wbDoc = xmlDoc('xl/workbook.xml');
+  if (!wbDoc) throw new Error('No se encontró xl/workbook.xml dentro del archivo');
+  var sheetEls = allByLocalName(wbDoc, 'sheet');
+  var sheetList = [];
+  for (var i=0; i<sheetEls.length; i++){
+    var rid = sheetEls[i].getAttribute('r:id') || sheetEls[i].getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    sheetList.push({name: sheetEls[i].getAttribute('name'), rId: rid});
+  }
+
+  // xl/_rels/workbook.xml.rels → rId -> ruta del archivo de cada hoja
+  var relsDoc = xmlDoc('xl/_rels/workbook.xml.rels');
+  var relMap = {};
+  if (relsDoc){
+    var relEls = allByLocalName(relsDoc, 'Relationship');
+    for (i=0; i<relEls.length; i++){
+      var rId = relEls[i].getAttribute('Id');
+      var target = relEls[i].getAttribute('Target');
+      if (target.charAt(0) === '/') target = target.substring(1);
+      else target = 'xl/' + target.replace(/^\.?\//, '');
+      relMap[rId] = target;
+    }
+  }
+
+  // xl/sharedStrings.xml → tabla de textos compartidos
+  var sharedStrings = [];
+  var ssDoc = xmlDoc('xl/sharedStrings.xml');
+  if (ssDoc){
+    var siEls = allByLocalName(ssDoc, 'si');
+    for (i=0; i<siEls.length; i++){
+      var tEls = allByLocalName(siEls[i], 't');
+      var text = '';
+      for (var j=0; j<tEls.length; j++){ text += tEls[j].textContent; }
+      sharedStrings.push(text);
+    }
+  }
+
+  var sheets = [];
+  for (i=0; i<sheetList.length; i++){
+    var target = relMap[sheetList[i].rId];
+    if (!target) continue;
+    var wsDoc = xmlDoc(target);
+    if (!wsDoc) continue;
+    var rowEls = allByLocalName(wsDoc, 'row');
+    var aoa = [];
+    for (var r=0; r<rowEls.length; r++){
+      var cEls = allByLocalName(rowEls[r], 'c');
+      for (var ci=0; ci<cEls.length; ci++){
+        var cEl = cEls[ci];
+        var ref = cEl.getAttribute('r');
+        if (!ref) continue;
+        var pos = colLetterToIndex(ref);
+        var t = cEl.getAttribute('t');
+        var value = '';
+        if (t === 's'){
+          var vEl = allByLocalName(cEl, 'v')[0];
+          var idx = vEl ? parseInt(vEl.textContent, 10) : -1;
+          value = (idx >= 0 && sharedStrings[idx] !== undefined) ? sharedStrings[idx] : '';
+        } else if (t === 'inlineStr'){
+          var isEl = allByLocalName(cEl, 'is')[0];
+          if (isEl){
+            var tEls2 = allByLocalName(isEl, 't');
+            for (var jj=0; jj<tEls2.length; jj++){ value += tEls2[jj].textContent; }
+          }
+        } else {
+          var vEl2 = allByLocalName(cEl, 'v')[0];
+          value = vEl2 ? vEl2.textContent : '';
+        }
+        if (!aoa[pos.row]) aoa[pos.row] = [];
+        aoa[pos.row][pos.col] = value;
+      }
+    }
+    var maxCols = 0;
+    for (r=0; r<aoa.length; r++){ if (aoa[r] && aoa[r].length > maxCols) maxCols = aoa[r].length; }
+    for (r=0; r<aoa.length; r++){
+      if (!aoa[r]) aoa[r] = [];
+      for (var cc=0; cc<maxCols; cc++){ if (aoa[r][cc] === undefined) aoa[r][cc] = ''; }
+    }
+    sheets.push({name: sheetList[i].name, aoa: aoa});
+  }
+  return sheets;
+}
+
 
 var AGENTES = JSON.parse(document.getElementById('agentesScript').textContent);
 var AGENTE_KEY = 'gu_t1_agente';
@@ -1159,7 +1491,7 @@ function parseNumeroLectura(str){
 
 /* ---------------- IndexedDB ---------------- */
 var DB_NAME = 'GU_T1_DB';
-var DB_VERSION = 1;
+var DB_VERSION = 2;
 var db = null;
 
 function openDB(cb){
@@ -1169,6 +1501,9 @@ function openDB(cb){
     var d = e.target.result;
     if (!d.objectStoreNames.contains('lecturas')){
       d.createObjectStore('lecturas', {keyPath:'med'});
+    }
+    if (!d.objectStoreNames.contains('lecturasAnteriores')){
+      d.createObjectStore('lecturasAnteriores', {keyPath:'med'});
     }
   };
   req.onsuccess = function(e){ db = e.target.result; cb(db); };
@@ -1211,8 +1546,50 @@ function dbDelete(med, cb){
   });
 }
 
+/* ---- Store de "lecturas anteriores" (importadas, para comparar en vivo) ---- */
+function dbGetAllAnteriores(cb){
+  openDB(function(d){
+    var tx = d.transaction('lecturasAnteriores','readonly');
+    var r = tx.objectStore('lecturasAnteriores').getAll();
+    r.onsuccess = function(){ cb(r.result || []); };
+    r.onerror = function(){ cb([]); };
+  });
+}
+function dbReemplazarAnteriores(registros, cb){
+  openDB(function(d){
+    var tx = d.transaction('lecturasAnteriores','readwrite');
+    var st = tx.objectStore('lecturasAnteriores');
+    st.clear().onsuccess = function(){
+      var i = 0;
+      function siguiente(){
+        if (i >= registros.length){ if (cb) cb(true); return; }
+        var rec = registros[i]; i++;
+        if (!rec || !rec.med){ siguiente(); return; }
+        var req = st.put(rec);
+        req.onsuccess = siguiente;
+        req.onerror = siguiente;
+      }
+      siguiente();
+    };
+  });
+}
+function dbBorrarAnteriores(cb){
+  openDB(function(d){
+    var tx = d.transaction('lecturasAnteriores','readwrite');
+    tx.objectStore('lecturasAnteriores').clear().onsuccess = function(){ if (cb) cb(); };
+  });
+}
+
 /* Cache en memoria de lecturas para no golpear IndexedDB constantemente */
 var LECTURAS = {}; // med -> record
+var LECTURAS_ANTERIORES = {}; // med -> {med, lectura, lecturaCodigos, fechaImportacion}
+function refreshCacheAnteriores(cb){
+  dbGetAllAnteriores(function(all){
+    LECTURAS_ANTERIORES = {};
+    for (var i=0;i<all.length;i++){ LECTURAS_ANTERIORES[all[i].med] = all[i]; }
+    if (cb) cb();
+  });
+}
 function refreshCache(cb){
   dbGetAll(function(all){
     LECTURAS = {};
@@ -1244,6 +1621,7 @@ var App = {
       App.showScreen('home');
       document.getElementById('navHome').classList.add('active');
     });
+    refreshCacheAnteriores();
     document.getElementById('globalSearch').addEventListener('input', App.onGlobalSearch);
     document.getElementById('zonaSearch').addEventListener('input', App.onZonaSearch);
     AgenteMod.updateBadge();
@@ -1621,6 +1999,13 @@ var App = {
         '<p class="dh-row" style="margin-top:0">Genera una planilla imprimible. Se abre el diálogo de impresión: elegí "Guardar como PDF".</p>' +
         '<button class="secondary" style="width:100%" onclick="ExportMod.exportPDF()">🖨️ Generar PDF</button>' +
       '</fieldset>' +
+      '<fieldset><legend>Lecturas del período anterior</legend>' +
+        '<p class="dh-row" style="margin-top:0">Subí el Excel de la última toma (el mismo formato que usa DPEC, una hoja por tipo de medidor). Con eso, mientras cargás, la app avisa si una lectura da menor o igual a la anterior — antes de guardar.</p>' +
+        '<div class="dh-row" id="anterioresEstadoTexto" style="margin-bottom:8px"></div>' +
+        '<button class="primary" style="width:100%; margin-bottom:10px" onclick="AnterioresMod.elegirArchivo()">📥 Importar Excel de lecturas anteriores</button>' +
+        '<button class="danger" style="width:100%" onclick="AnterioresMod.borrar()">🗑️ Borrar lecturas anteriores importadas</button>' +
+        '<input type="file" id="anterioresFileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" onchange="AnterioresMod.onFileSelected(event)">' +
+      '</fieldset>' +
       '<fieldset><legend>Respaldo del trabajo</legend>' +
         '<p class="dh-row" style="margin-top:0">A diferencia del CSV, el respaldo guarda TODO tal cual está (incluidas las fotos) para poder seguir cargando después o pasarlo a otro celular.</p>' +
         '<button class="primary" style="width:100%; margin-bottom:10px" onclick="BackupMod.crear()">💾 Crear respaldo</button>' +
@@ -1632,6 +2017,7 @@ var App = {
         '<button class="danger" style="width:100%" onclick="ExportMod.confirmClearAll()">🗑️ Borrar todos los datos locales</button>' +
       '</fieldset>';
     document.getElementById('screen-export').innerHTML = html;
+    AnterioresMod.mostrarEstado();
   }
 };
 
@@ -1714,19 +2100,21 @@ var Detail = {
               '<input type="text" inputmode="decimal" enterkeyhint="'+(esUltimo?'done':'next')+'" ' +
                 'class="fLecturaCod" data-cod="'+escAttr(cod)+'" value="'+escAttr(val)+'" ' +
                 'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); Detail.focusNextLecturaField(this);}" ' +
-                'oninput="Detail.checkSumaBandasEnVivo()">' +
+                'oninput="Detail.checkSumaBandasEnVivo(); Detail.checkLecturaAnteriorEnVivo();">' +
             '</div>';
           flatIdx++;
         }
       }
       lecturaFieldsHtml += '</div>';
       lecturaFieldsHtml += '<div id="avisoSumaBandas"></div>';
+      lecturaFieldsHtml += '<div id="avisoLecturaAnterior"></div>';
     } else {
       lecturaFieldsHtml =
         '<label class="flabel">Lectura del medidor</label>' +
         '<input type="text" id="fLectura" placeholder="Ej: 004521 o A0452" value="'+escAttr(this.data.lectura)+'" ' +
-          'oninput="Detail.checkLecturaSospechosaEnVivo()">' +
-        '<div id="avisoLecturaSospechosa"></div>';
+          'oninput="Detail.checkLecturaSospechosaEnVivo(); Detail.checkLecturaAnteriorEnVivo();">' +
+        '<div id="avisoLecturaSospechosa"></div>' +
+        '<div id="avisoLecturaAnterior"></div>';
     }
 
     var html =
@@ -1786,6 +2174,7 @@ var Detail = {
     this.captureGpsSilently();
     if (this.codigos && this.codigos.length) this.checkSumaBandasEnVivo();
     else this.checkLecturaSospechosaEnVivo();
+    this.checkLecturaAnteriorEnVivo();
   },
 
   renderFoto: function(){
@@ -1879,6 +2268,53 @@ var Detail = {
     var hayConflicto = this.data.ordenativos.some(function(c){ return c && CODIGOS_SIN_ACCESO.indexOf(c) >= 0; });
     aviso.innerHTML = (tieneLectura && hayConflicto)
       ? '<div class="aviso-vivo">⚠️ Cargaste una lectura y también un ordenativo de "sin acceso / no se encontró el medidor". Revisá si corresponde.</div>'
+      : '';
+  },
+
+  /* Validación en vivo: compara contra la lectura anterior importada (si hay).
+     Si el valor nuevo da menor o igual al anterior, avisa antes de guardar. */
+  checkLecturaAnteriorEnVivo: function(){
+    var aviso = document.getElementById('avisoLecturaAnterior');
+    if (!aviso) return;
+    var anterior = LECTURAS_ANTERIORES[this.med];
+    if (!anterior){ aviso.innerHTML = ''; return; }
+
+    var mensajes = [];
+    var inputSimple = document.getElementById('fLectura');
+    if (inputSimple){
+      inputSimple.classList.remove('campo-alerta');
+      var actualN = parseNumeroLectura(inputSimple.value);
+      var anteriorN = parseNumeroLectura(anterior.lectura);
+      if (actualN!=null && anteriorN!=null){
+        if (actualN < anteriorN){
+          inputSimple.classList.add('campo-alerta');
+          mensajes.push('La lectura ('+actualN+') es MENOR a la anterior ('+anteriorN+'). ¿Es correcta?');
+        } else if (actualN === anteriorN){
+          inputSimple.classList.add('campo-alerta');
+          mensajes.push('Es idéntica a la lectura anterior ('+anteriorN+'). ¿Seguro que se volvió a tomar?');
+        }
+      }
+    }
+
+    var inputsCod = document.querySelectorAll('.fLecturaCod');
+    for (var i=0;i<inputsCod.length;i++){
+      var cod = inputsCod[i].getAttribute('data-cod');
+      var fila = document.getElementById('fila-'+cod);
+      var actualC = parseNumeroLectura(inputsCod[i].value);
+      var anteriorC = anterior.lecturaCodigos ? parseNumeroLectura(anterior.lecturaCodigos[cod]) : null;
+      if (fila) fila.classList.remove('campo-alerta-anterior');
+      if (actualC==null || anteriorC==null) continue;
+      if (actualC < anteriorC){
+        if (fila) fila.classList.add('campo-alerta-anterior');
+        mensajes.push(cod+': dio '+actualC+', menor a la anterior ('+anteriorC+').');
+      } else if (actualC === anteriorC){
+        if (fila) fila.classList.add('campo-alerta-anterior');
+        mensajes.push(cod+': idéntico a la anterior ('+anteriorC+').');
+      }
+    }
+
+    aviso.innerHTML = mensajes.length
+      ? '<div class="aviso-vivo">⚠️ '+mensajes.map(escHtml).join('<br>⚠️ ')+'</div>'
       : '';
   },
 
@@ -2307,6 +2743,107 @@ function clearAllLocalDataSilent(cb){
 }
 
 /* ---------------- Respaldo / Restauración ---------------- */
+/* Convierte una hoja "transpuesta" (una columna por usuario, códigos como filas)
+   directo al formato nativo de la app: {med, lectura, lecturaCodigos}. */
+function convertirHojaAnteriores(aoa){
+  function limpiar(v){ return (v==null?'':String(v)).trim(); }
+  var idxNombre=-1, idxMdor=-1, idxLecturista=-1, idxObs=-1;
+  for (var i=0;i<aoa.length;i++){
+    var lbl = limpiar(aoa[i] ? aoa[i][0] : '');
+    if (lbl==='NOMBRE' && idxNombre===-1) idxNombre=i;
+    else if (lbl==='MDOR Nº' && idxMdor===-1) idxMdor=i;
+    else if (lbl==='LECTURISTA' && idxLecturista===-1) idxLecturista=i;
+    else if (lbl==='OBSERVACION') idxObs=i;
+  }
+  if (idxNombre===-1 || idxMdor===-1) return [];
+  var ncols=0;
+  for (var r=0;r<aoa.length;r++){ if (aoa[r] && aoa[r].length>ncols) ncols=aoa[r].length; }
+  var out=[];
+  for (var j=1;j<ncols;j++){
+    var nombre = limpiar(aoa[idxNombre][j]);
+    if (!nombre) continue;
+    var medidor = limpiar(aoa[idxMdor][j]);
+    if (!medidor) continue;
+    var lecturaSimple='';
+    var lecturaCodigos={};
+    var ini = idxLecturista>=0 ? idxLecturista+1 : idxNombre+1;
+    var fin = idxObs>=0 ? idxObs : aoa.length;
+    for (var i2=ini;i2<fin;i2++){
+      var lbl2 = limpiar(aoa[i2] ? aoa[i2][0] : '');
+      if (!lbl2) continue;
+      var val2 = aoa[i2] ? aoa[i2][j] : '';
+      if (val2===undefined || val2===null || String(val2).trim()==='') continue;
+      if (lbl2==='Fecha') continue;
+      if (lbl2==='Lectura'){ lecturaSimple = String(val2).trim(); continue; }
+      lecturaCodigos[lbl2] = String(val2).trim();
+    }
+    out.push({med: medidor, lectura: lecturaSimple, lecturaCodigos: lecturaCodigos});
+  }
+  return out;
+}
+
+var AnterioresMod = {
+  elegirArchivo: function(){
+    var input = document.getElementById('anterioresFileInput');
+    if (input) input.click();
+  },
+
+  onFileSelected: function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        var datos = new Uint8Array(e.target.result);
+        var hojas = xlsxToSheets(datos);
+        var todos = [];
+        for (var s=0;s<hojas.length;s++){
+          todos = todos.concat(convertirHojaAnteriores(hojas[s].aoa));
+        }
+        if (!todos.length){
+          toast('No reconocí el formato de ese Excel (¿tiene NOMBRE / MDOR Nº como filas?)');
+          return;
+        }
+        var fecha = new Date().toISOString();
+        for (var i=0;i<todos.length;i++){ todos[i].fechaImportacion = fecha; }
+        dbReemplazarAnteriores(todos, function(){
+          refreshCacheAnteriores(function(){
+            toast('Importado ✓ ('+todos.length+' medidores)');
+            AnterioresMod.mostrarEstado();
+          });
+        });
+      } catch(err){
+        toast('No se pudo leer ese Excel: ' + err.message);
+      }
+    };
+    reader.onerror = function(){ toast('Error leyendo el archivo'); };
+    reader.readAsArrayBuffer(file);
+  },
+
+  mostrarEstado: function(){
+    var el = document.getElementById('anterioresEstadoTexto');
+    if (!el) return;
+    var meds = Object.keys(LECTURAS_ANTERIORES);
+    if (!meds.length){
+      el.textContent = 'Todavía no importaste ninguna lectura anterior.';
+      return;
+    }
+    var fechaImport = LECTURAS_ANTERIORES[meds[0]].fechaImportacion;
+    var fechaTxt = fechaImport ? new Date(fechaImport).toLocaleString('es-AR') : '';
+    el.textContent = meds.length + ' medidores importados' + (fechaTxt ? ' · ' + fechaTxt : '');
+  },
+
+  borrar: function(){
+    if (!confirm('¿Borrar las lecturas anteriores importadas? Vas a dejar de ver los avisos de "lectura menor/igual" hasta que importes de nuevo.')) return;
+    dbBorrarAnteriores(function(){
+      LECTURAS_ANTERIORES = {};
+      toast('Lecturas anteriores borradas');
+      AnterioresMod.mostrarEstado();
+    });
+  }
+};
+
 var BackupMod = {
   crear: function(){
     dbGetAll(function(all){
