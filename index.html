@@ -117,6 +117,21 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 .summary-chip.novedad b{color:var(--orange);}
 .summary-chip.problema b{color:var(--red);}
 
+/* ---- selector Por zona / Por tipo ---- */
+.vista-toggle{display:flex; gap:8px; margin-bottom:12px;}
+.vista-toggle-btn{
+  flex:1; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--panel);
+  color:var(--text-dim); font-size:13px; font-weight:600; cursor:pointer;
+}
+.vista-toggle-btn.active{background:var(--amber); color:#1a1206; border-color:var(--amber);}
+
+/* ---- banner de zonas asignadas ---- */
+.banner-asignadas{
+  background:var(--green-tint); border:1px solid var(--green-dim); border-radius:10px;
+  padding:9px 12px; font-size:12px; color:#1f7a4d; margin-bottom:10px;
+}
+.banner-asignadas .banner-link{text-decoration:underline; cursor:pointer; font-weight:600;}
+
 /* ---- filtro pendientes/relevados ---- */
 .filter-row{display:flex; gap:8px; margin-bottom:10px; overflow-x:auto; padding-bottom:2px;}
 .filter-chip{
@@ -158,6 +173,7 @@ header.topbar .brand span{color:var(--text-dim); font-size:11.5px;}
 .user-card .u-med{font-size:13.5px; color:var(--amber); font-weight:600; white-space:nowrap;}
 .user-card .u-lapiz{font-size:14px; white-space:nowrap;}
 .tag.tag-cambio{color:var(--amber); border-color:var(--amber-dim); background:var(--amber-tint);}
+.tag.tag-zona{color:var(--blue); border-color:var(--blue-dim); background:var(--blue-tint);}
 .user-card .u-dir{font-size:13px; color:var(--text-dim); margin-top:2px;}
 .user-card .u-tags{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;}
 .tag{font-size:11.5px; padding:2px 7px; border-radius:20px; background:var(--panel2); color:var(--text-dim); border:1px solid var(--border);}
@@ -365,6 +381,12 @@ nav.bottomnav button.active{color:var(--amber);}
 
 /* ---- misc ---- */
 .section-title{font-size:12.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 8px;}
+.tipo-zona-header{
+  font-size:12.5px; font-weight:700; color:var(--amber); text-transform:uppercase; letter-spacing:.4px;
+  background:var(--amber-tint); border:1px solid var(--amber-dim); border-radius:8px;
+  padding:7px 10px; margin:14px 0 6px;
+}
+.tipo-zona-header:first-child{margin-top:0;}
 .section-title:first-child{margin-top:0;}
 .hidden{display:none !important;}
 .spacer{flex:1;}
@@ -397,9 +419,32 @@ nav.bottomnav button.active{color:var(--amber);}
 
     <div id="homeDefault">
       <div class="summary-strip" id="summaryStrip"></div>
-      <div class="section-title">Zonas (26)</div>
-      <div class="zona-list" id="zonaList"></div>
+      <div id="bannerZonasAsignadas" class="banner-asignadas hidden"></div>
+      <div class="vista-toggle">
+        <button id="vistaZonaBtn" class="vista-toggle-btn active" onclick="App.cambiarVistaHome('zona')">📍 Por zona</button>
+        <button id="vistaTipoBtn" class="vista-toggle-btn" onclick="App.cambiarVistaHome('tipo')">🔧 Por tipo</button>
+      </div>
+      <div id="vistaZonaWrap">
+        <div class="section-title" id="tituloZonas">Zonas (26)</div>
+        <div class="zona-list" id="zonaList"></div>
+      </div>
+      <div id="vistaTipoWrap" class="hidden">
+        <div class="section-title">Tipo de medidor</div>
+        <div class="zona-list" id="tipoList"></div>
+      </div>
     </div>
+  </section>
+
+  <!-- PANTALLA: LISTA POR TIPO DE MEDIDOR -->
+  <section class="screen" id="screen-tipo">
+    <div class="searchbar">
+      <span class="search-ico">🔍</span>
+      <input type="text" id="tipoSearch" placeholder="Buscá dentro de este tipo...">
+      <span class="clr hidden" id="tipoSearchClr" onclick="App.clearTipoSearch()">✕</span>
+    </div>
+    <div class="summary-strip" id="tipoSummaryStrip"></div>
+    <div class="filter-row" id="tipoFilterRow"></div>
+    <div class="user-list" id="tipoUserList"></div>
   </section>
 
   <!-- PANTALLA: MI RUTA (resumen simple de la zona + próximo pendiente) -->
@@ -471,11 +516,23 @@ nav.bottomnav button.active{color:var(--amber);}
   </div>
 </div>
 
+<div class="modal-bg" id="asignarZonasModal">
+  <div class="modal-box">
+    <h3>Armar asignación de zonas</h3>
+    <label class="flabel">Nombre del lecturista (para identificar el archivo)</label>
+    <input type="text" id="asignarLecturistaInput" placeholder="Ej: LUGO, NORBERTO (703)">
+    <label class="flabel" style="margin-top:10px">Zonas a asignar</label>
+    <div class="ord-list" id="asignarZonasLista"></div>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="secondary" onclick="AsignarMod.cerrarModal()">Cancelar</button>
+      <button class="primary" onclick="AsignarMod.confirmarYExportar()">📤 Enviar asignación</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="agenteModal">
   <div class="modal-box">
-    <h3>👋 Antes de arrancar</h3>
-    <p class="dh-row" style="margin:0 0 4px">Ingresá tu código de agente para identificar tus lecturas. <b>Es el mismo código con el que fichás/te identificás en prefacturación</b> — si no lo sabés, pedíselo a tu supervisor.</p>
-    <p class="dh-row" style="margin:0 0 4px">Queda guardado en este celular mientras uses la app.</p>
+    <h3>Ingresar código</h3>
     <div id="agenteCurrentBox"></div>
     <label class="flabel">Código de operario</label>
     <input type="text" inputmode="numeric" id="agenteCodeInput" placeholder="Ej: 703" onkeydown="if(event.key==='Enter') AgenteMod.loginByCode()">
@@ -1101,6 +1158,44 @@ var ZONAS = (function(){
   return arr;
 })();
 
+/* ---------------- Asignación de zonas por lecturista ---------------- */
+var ZONAS_ASIGNADAS_KEY = 'gu_t1_zonas_asignadas';
+var ZONAS_ASIGNADAS_META_KEY = 'gu_t1_zonas_asignadas_meta';
+var ZONAS_ASIGNADAS = [];
+var ZONAS_ASIGNADAS_META = null; // {lecturista, creadoEl}
+var verTodasLasZonas = false; // escape temporal, no se guarda
+
+function cargarZonasAsignadas(){
+  try {
+    var raw = localStorage.getItem(ZONAS_ASIGNADAS_KEY);
+    ZONAS_ASIGNADAS = raw ? JSON.parse(raw) : [];
+    var rawMeta = localStorage.getItem(ZONAS_ASIGNADAS_META_KEY);
+    ZONAS_ASIGNADAS_META = rawMeta ? JSON.parse(rawMeta) : null;
+  } catch(e){ ZONAS_ASIGNADAS = []; ZONAS_ASIGNADAS_META = null; }
+}
+function guardarZonasAsignadas(zonas, meta){
+  try {
+    localStorage.setItem(ZONAS_ASIGNADAS_KEY, JSON.stringify(zonas));
+    localStorage.setItem(ZONAS_ASIGNADAS_META_KEY, JSON.stringify(meta || null));
+  } catch(e){}
+  ZONAS_ASIGNADAS = zonas;
+  ZONAS_ASIGNADAS_META = meta || null;
+}
+function borrarZonasAsignadas(){
+  try {
+    localStorage.removeItem(ZONAS_ASIGNADAS_KEY);
+    localStorage.removeItem(ZONAS_ASIGNADAS_META_KEY);
+  } catch(e){}
+  ZONAS_ASIGNADAS = [];
+  ZONAS_ASIGNADAS_META = null;
+}
+/* Zonas que corresponde mostrar en Inicio: todas si no hay asignación
+   (o si el usuario tocó "ver todas" en esta sesión), o solo las asignadas. */
+function zonasAMostrar(){
+  if (verTodasLasZonas || !ZONAS_ASIGNADAS.length) return ZONAS;
+  return ZONAS.filter(function(z){ return ZONAS_ASIGNADAS.indexOf(z) >= 0; });
+}
+
 var ORDENATIVOS = JSON.parse(document.getElementById('ordenativosScript').textContent);
 var ORD_BY_COD = {};
 (function(){
@@ -1431,6 +1526,29 @@ function getZonaOrdenada(zona){
   return ordenada;
 }
 
+/* Igual que getZonaOrdenada, pero para un tipo de medidor en particular
+   (puede haber usuarios de varias zonas) — ordenados por zona y después
+   por calle/altura dentro de cada zona. */
+var TIPO_ORDENADO_CACHE = {};
+function getTipoOrdenado(tipo){
+  if (TIPO_ORDENADO_CACHE[tipo]) return TIPO_ORDENADO_CACHE[tipo];
+  var list = USERS.filter(function(u){ return u.tipo === tipo; });
+  var conParse = list.map(function(u){
+    var p = parseDireccion(u.dir);
+    return {u:u, calle:p.calle, altura:p.altura};
+  });
+  conParse.sort(function(a,b){
+    if (a.u.zona < b.u.zona) return -1;
+    if (a.u.zona > b.u.zona) return 1;
+    if (a.calle < b.calle) return -1;
+    if (a.calle > b.calle) return 1;
+    return a.altura - b.altura;
+  });
+  var ordenada = conParse.map(function(x){ return x.u; });
+  TIPO_ORDENADO_CACHE[tipo] = ordenada;
+  return ordenada;
+}
+
 /* Primer medidor pendiente (sin lectura ni ordenativos) en el orden de calle,
    o null si no queda ninguno pendiente en esa zona. */
 function primerPendiente(zona){
@@ -1622,8 +1740,10 @@ var App = {
       document.getElementById('navHome').classList.add('active');
     });
     refreshCacheAnteriores();
+    cargarZonasAsignadas();
     document.getElementById('globalSearch').addEventListener('input', App.onGlobalSearch);
     document.getElementById('zonaSearch').addEventListener('input', App.onZonaSearch);
+    document.getElementById('tipoSearch').addEventListener('input', App.onTipoSearch);
     AgenteMod.updateBadge();
     if (!AgenteMod.get()){
       setTimeout(function(){ AgenteMod.openModal(); }, 300);
@@ -1664,7 +1784,7 @@ var App = {
     var navHome = document.getElementById('navHome');
     var navExport = document.getElementById('navExport');
     var navMap = document.getElementById('navMap');
-    navHome.classList.toggle('active', name==='home' || name==='ruta' || name==='zona' || name==='detail');
+    navHome.classList.toggle('active', name==='home' || name==='ruta' || name==='zona' || name==='tipo' || name==='detail');
     navExport.classList.toggle('active', name==='export');
     navMap.classList.toggle('active', name==='map');
     window.scrollTo(0,0);
@@ -1727,6 +1847,12 @@ var App = {
       this.pushNavState();
       return;
     }
+    var asignarModal = document.getElementById('asignarZonasModal');
+    if (asignarModal && asignarModal.classList.contains('show')){
+      AsignarMod.cerrarModal();
+      this.pushNavState();
+      return;
+    }
     if (ordModal && ordModal.classList.contains('show')){
       OrdMod.closeModal();
       this.pushNavState();
@@ -1753,6 +1879,8 @@ var App = {
       this.openRuta(this.currentZona, true);
     } else if (prev === 'zona'){
       this.openZona(this.currentZona, true);
+    } else if (prev === 'tipo'){
+      this.openTipo(this.currentTipo, true);
     } else if (prev === 'detail'){
       Detail.render(this.currentMed);
       document.getElementById('hdrTitle').textContent = 'N° '+this.currentMed;
@@ -1786,8 +1914,13 @@ var App = {
 
   /* ---- HOME ---- */
   renderHome: function(){
-    var total = USERS.length;
-    var globalStats = computeStats(USERS);
+    var zonasVisibles = zonasAMostrar();
+    var mostrandoTodo = (zonasVisibles.length === ZONAS.length);
+    var usersVisibles = mostrandoTodo ? USERS : USERS.filter(function(u){ return zonasVisibles.indexOf(u.zona) >= 0; });
+    this.usersVisiblesCache = usersVisibles;
+
+    var total = usersVisibles.length;
+    var globalStats = computeStats(usersVisibles);
     var strip = document.getElementById('summaryStrip');
     strip.innerHTML =
       '<div class="summary-chip done"><b>'+(globalStats.ok+globalStats.novedad+globalStats.problema)+'</b><span>Relevados</span></div>' +
@@ -1795,15 +1928,27 @@ var App = {
       '<div class="summary-chip novedad"><b>'+(globalStats.novedad+globalStats.problema)+'</b><span>Con novedad</span></div>' +
       '<div class="summary-chip"><b>'+total+'</b><span>Total GU</span></div>';
 
-    var byZona = {};
-    for (var i=0;i<USERS.length;i++){
-      var z = USERS[i].zona;
-      byZona[z] = byZona[z] || [];
-      byZona[z].push(USERS[i]);
+    var bannerEl = document.getElementById('bannerZonasAsignadas');
+    if (ZONAS_ASIGNADAS.length){
+      bannerEl.innerHTML =
+        '<span>📋 '+(verTodasLasZonas ? 'Mostrando TODAS las zonas' : 'Mostrando tus '+ZONAS_ASIGNADAS.length+' zonas asignadas')+'</span>' +
+        ' · <span class="banner-link" onclick="App.toggleVerTodasZonas()">'+(verTodasLasZonas ? 'volver a mis zonas' : 'ver todas')+'</span>';
+      bannerEl.classList.remove('hidden');
+    } else {
+      bannerEl.innerHTML = '';
+      bannerEl.classList.add('hidden');
     }
+
+    var byZona = {};
+    for (var i=0;i<usersVisibles.length;i++){
+      var z = usersVisibles[i].zona;
+      byZona[z] = byZona[z] || [];
+      byZona[z].push(usersVisibles[i]);
+    }
+    document.getElementById('tituloZonas').textContent = 'Zonas ('+zonasVisibles.length+')';
     var html = '';
-    for (var j=0;j<ZONAS.length;j++){
-      var zn = ZONAS[j];
+    for (var j=0;j<zonasVisibles.length;j++){
+      var zn = zonasVisibles[j];
       var st = computeStats(byZona[zn] || []);
       var done = st.ok + st.novedad + st.problema;
       var pct = st.total ? Math.round(done*100/st.total) : 0;
@@ -1822,7 +1967,55 @@ var App = {
         '<div class="zpct">'+pct+'%</div>' +
       '</div>';
     }
-    document.getElementById('zonaList').innerHTML = html;
+    document.getElementById('zonaList').innerHTML = html || '<div class="empty">No tenés zonas asignadas todavía.</div>';
+
+    this.renderTipoCards(usersVisibles);
+  },
+
+  renderTipoCards: function(usersVisibles){
+    var byTipo = {};
+    var ordenTipos = [];
+    for (var i=0;i<usersVisibles.length;i++){
+      var t = usersVisibles[i].tipo;
+      if (!byTipo[t]){ byTipo[t] = []; ordenTipos.push(t); }
+      byTipo[t].push(usersVisibles[i]);
+    }
+    ordenTipos.sort(function(a,b){ return byTipo[b].length - byTipo[a].length; });
+    var html = '';
+    for (var j=0;j<ordenTipos.length;j++){
+      var tn = ordenTipos[j];
+      var st = computeStats(byTipo[tn]);
+      var done = st.ok + st.novedad + st.problema;
+      var pct = st.total ? Math.round(done*100/st.total) : 0;
+      html += '<div class="zona-card" onclick="App.openTipo(\''+escAttr(tn)+'\')">' +
+        '<div class="zinfo">' +
+          '<div class="zname">'+escHtml(tn)+'</div>' +
+          '<div class="zbar"><div class="zbar-fill" style="width:'+pct+'%"></div></div>' +
+          '<div class="zstats">' +
+            '<span class="zstat zs-ok">🟢 '+st.ok+'</span>' +
+            '<span class="zstat zs-novedad">🟠 '+st.novedad+'</span>' +
+            '<span class="zstat zs-problema">🔴 '+st.problema+'</span>' +
+            '<span class="zstat zs-pendiente">⚪ '+st.pendiente+'</span>' +
+          '</div>' +
+          '<div class="zcount">'+done+' / '+st.total+' = '+pct+'%</div>' +
+        '</div>' +
+        '<div class="zpct">'+pct+'%</div>' +
+      '</div>';
+    }
+    document.getElementById('tipoList').innerHTML = html || '<div class="empty">Sin medidores para mostrar.</div>';
+  },
+
+  cambiarVistaHome: function(vista){
+    this.vistaHome = vista;
+    document.getElementById('vistaZonaBtn').classList.toggle('active', vista==='zona');
+    document.getElementById('vistaTipoBtn').classList.toggle('active', vista==='tipo');
+    document.getElementById('vistaZonaWrap').classList.toggle('hidden', vista!=='zona');
+    document.getElementById('vistaTipoWrap').classList.toggle('hidden', vista!=='tipo');
+  },
+
+  toggleVerTodasZonas: function(){
+    verTodasLasZonas = !verTodasLasZonas;
+    this.renderHome();
   },
 
   onGlobalSearch: function(){
@@ -1957,9 +2150,119 @@ var App = {
     App.onZonaSearch();
   },
 
+  /* ---- TIPO DE MEDIDOR ---- */
+  openTipo: function(tipo, isBack){
+    this.currentTipo = tipo;
+    if (!isBack){
+      this.pushNavState();
+      this.stack.push('tipo');
+      this.tipoFilter = 'todos';
+    }
+    document.getElementById('hdrTitle').textContent = tipo;
+    document.getElementById('hdrSub').textContent = 'Todas las zonas · Relevamiento GU';
+    document.getElementById('tipoSearch').value = '';
+    document.getElementById('tipoSearchClr').classList.add('hidden');
+    this.renderTipoScreenList('');
+    this.showScreen('tipo');
+  },
+
+  renderTipoScreenList: function(q){
+    var tipo = this.currentTipo;
+    var zonasVisibles = zonasAMostrar();
+    var mostrandoTodo = (zonasVisibles.length === ZONAS.length);
+    var list = getTipoOrdenado(tipo);
+    if (!mostrandoTodo){ list = list.filter(function(u){ return zonasVisibles.indexOf(u.zona) >= 0; }); }
+
+    var st = computeStats(list);
+    var total = st.total, done = st.ok + st.novedad + st.problema;
+    var pct = total ? Math.round(done*100/total) : 0;
+    document.getElementById('tipoSummaryStrip').innerHTML =
+      '<div class="summary-chip done"><b>🟢 '+st.ok+'</b><span>OK</span></div>' +
+      '<div class="summary-chip novedad"><b>🟠 '+st.novedad+'</b><span>Novedad</span></div>' +
+      '<div class="summary-chip problema"><b>🔴 '+st.problema+'</b><span>Problema</span></div>' +
+      '<div class="summary-chip"><b>⚪ '+st.pendiente+'</b><span>Pendiente</span></div>' +
+      '<div class="summary-chip"><b>'+done+'/'+total+'</b><span>'+pct+'%</span></div>';
+
+    this.renderTipoFilterRow();
+
+    if (q){
+      var ql = q.toLowerCase();
+      list = list.filter(function(u){
+        return u.med.toLowerCase().indexOf(ql)>=0 ||
+               u.nom.toLowerCase().indexOf(ql)>=0 ||
+               u.dir.toLowerCase().indexOf(ql)>=0 ||
+               u.us.toLowerCase().indexOf(ql)>=0 ||
+               u.zona.toLowerCase().indexOf(ql)>=0;
+      });
+    }
+
+    var filtro = this.tipoFilter || 'todos';
+    if (filtro !== 'todos'){
+      list = list.filter(function(u){
+        var r = LECTURAS[u.med];
+        var hasLectura = hasLecturaValor(r);
+        var hasOrd = !!(r && r.ordenativos && r.ordenativos.length);
+        if (filtro === 'pendientes') return !hasLectura && !hasOrd;
+        if (filtro === 'relevados') return hasLectura || hasOrd;
+        if (filtro === 'novedad') return hasOrd;
+        return true;
+      });
+    }
+
+    if (!list.length){
+      document.getElementById('tipoUserList').innerHTML = '<div class="empty">Sin resultados</div>';
+      return;
+    }
+    var htmlList = '';
+    var zonaAnterior = null;
+    for (var i=0;i<list.length;i++){
+      if (list[i].zona !== zonaAnterior){
+        zonaAnterior = list[i].zona;
+        htmlList += '<div class="tipo-zona-header">📍 '+escHtml(zonaAnterior)+'</div>';
+      }
+      htmlList += renderUserCard(list[i]);
+    }
+    document.getElementById('tipoUserList').innerHTML = htmlList;
+  },
+
+  renderTipoFilterRow: function(){
+    var el = document.getElementById('tipoFilterRow');
+    if (!el) return;
+    var filtro = this.tipoFilter || 'todos';
+    var opts = [
+      {v:'todos', label:'Todos'},
+      {v:'pendientes', label:'Pendientes'},
+      {v:'relevados', label:'Relevados'},
+      {v:'novedad', label:'Con novedad'}
+    ];
+    var html = '';
+    for (var i=0;i<opts.length;i++){
+      var o = opts[i];
+      html += '<button class="filter-chip'+(filtro===o.v?' active':'')+'" onclick="App.setTipoFilter(\''+o.v+'\')">'+o.label+'</button>';
+    }
+    el.innerHTML = html;
+  },
+
+  setTipoFilter: function(v){
+    this.tipoFilter = v;
+    this.renderTipoScreenList(document.getElementById('tipoSearch').value.trim());
+  },
+
+  onTipoSearch: function(){
+    var q = document.getElementById('tipoSearch').value.trim();
+    document.getElementById('tipoSearchClr').classList.toggle('hidden', q.length===0);
+    App.renderTipoScreenList(q);
+  },
+  clearTipoSearch: function(){
+    document.getElementById('tipoSearch').value = '';
+    App.onTipoSearch();
+  },
+
   /* ---- DETALLE ---- */
   openDetail: function(med){
     this.currentMed = med;
+    var u = USERS_BY_MED[med];
+    if (u) this.currentZona = u.zona;
     this.pushNavState();
     this.stack.push('detail');
     Detail.render(med);
@@ -2006,6 +2309,17 @@ var App = {
         '<button class="danger" style="width:100%" onclick="AnterioresMod.borrar()">🗑️ Borrar lecturas anteriores importadas</button>' +
         '<input type="file" id="anterioresFileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" onchange="AnterioresMod.onFileSelected(event)">' +
       '</fieldset>' +
+      '<fieldset><legend>Asignar zonas (para administrativos)</legend>' +
+        '<p class="dh-row" style="margin-top:0">Armá qué zonas le corresponden a cada lecturista y enviaselo a su celular — así en Inicio solo ve sus zonas, no las 26.</p>' +
+        '<button class="secondary" style="width:100%" onclick="AsignarMod.abrirModal()">🗂️ Armar asignación de zonas</button>' +
+      '</fieldset>' +
+      '<fieldset><legend>Mis zonas asignadas</legend>' +
+        '<p class="dh-row" style="margin-top:0">Si un administrativo te mandó una asignación, importala acá — tu Inicio va a mostrar solo esas zonas.</p>' +
+        '<div class="dh-row" id="zonasAsignadasEstadoTexto" style="margin-bottom:8px"></div>' +
+        '<button class="primary" style="width:100%; margin-bottom:10px" onclick="AsignacionMod.elegirArchivo()">📥 Importar asignación recibida</button>' +
+        '<button class="danger" style="width:100%" onclick="AsignacionMod.borrar()">🗑️ Quitar mi asignación (ver todas)</button>' +
+        '<input type="file" id="asignacionFileInput" accept="application/json,.json" class="hidden" onchange="AsignacionMod.onFileSelected(event)">' +
+      '</fieldset>' +
       '<fieldset><legend>Respaldo del trabajo</legend>' +
         '<p class="dh-row" style="margin-top:0">A diferencia del CSV, el respaldo guarda TODO tal cual está (incluidas las fotos) para poder seguir cargando después o pasarlo a otro celular.</p>' +
         '<button class="primary" style="width:100%; margin-bottom:10px" onclick="BackupMod.crear()">💾 Crear respaldo</button>' +
@@ -2018,6 +2332,7 @@ var App = {
       '</fieldset>';
     document.getElementById('screen-export').innerHTML = html;
     AnterioresMod.mostrarEstado();
+    AsignacionMod.mostrarEstado();
   }
 };
 
@@ -2029,13 +2344,14 @@ function escAttr(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
 }
 
-function renderUserCard(u){
+function renderUserCard(u, mostrarZona){
   var r = LECTURAS[u.med];
   var st = derivedStatus(r);
   var stCls = st.cls, stLabel = st.label, cardCls = (st.cls==='st-pendiente') ? '' : st.cls;
   var esCambio = !!(r && r.cambioMedidor);
   var camb = esCambio ? '<span class="tag tag-cambio">🖍️ Cambio medidor</span>' : '';
   var lapiz = esCambio ? '<span class="u-lapiz" title="Cambio de medidor">🖍️</span>' : '';
+  var zonaTag = mostrarZona ? '<span class="tag tag-zona">📍 '+escHtml(u.zona)+'</span>' : '';
   return '<div class="user-card '+cardCls+'" onclick="App.openDetail(\''+escAttr(u.med)+'\')">' +
     '<div class="u-top">' +
       '<div class="u-nom">'+escHtml(u.nom)+'</div>' +
@@ -2046,6 +2362,7 @@ function renderUserCard(u){
     '<div class="u-tags">' +
       '<span class="tag st '+stCls+'">'+stLabel+'</span>' +
       '<span class="tag">'+escHtml(u.ug)+'</span>' +
+      zonaTag +
       camb +
     '</div>' +
   '</div>';
@@ -2841,6 +3158,122 @@ var AnterioresMod = {
       toast('Lecturas anteriores borradas');
       AnterioresMod.mostrarEstado();
     });
+  }
+};
+
+/* ---------------- Armar asignación de zonas (para administrativos) ---------------- */
+var AsignarMod = {
+  abrirModal: function(){
+    var lista = document.getElementById('asignarZonasLista');
+    var html = '';
+    for (var i=0;i<ZONAS.length;i++){
+      var zn = ZONAS[i];
+      var marcado = ZONAS_ASIGNADAS.indexOf(zn) >= 0;
+      html += '<div class="ord-item'+(marcado?' selected':'')+'" onclick="AsignarMod.toggleZona(this,\''+escAttr(zn)+'\')" data-zona="'+escAttr(zn)+'">' +
+        '<span class="o-desc">'+escHtml(zn)+'</span>' +
+        (marcado ? '<span class="o-check">✓</span>' : '') +
+      '</div>';
+    }
+    lista.innerHTML = html;
+    document.getElementById('asignarLecturistaInput').value = ZONAS_ASIGNADAS_META ? (ZONAS_ASIGNADAS_META.lecturista||'') : '';
+    document.getElementById('asignarZonasModal').classList.add('show');
+    App.pushNavState();
+  },
+  cerrarModal: function(){
+    document.getElementById('asignarZonasModal').classList.remove('show');
+  },
+  toggleZona: function(el, zona){
+    var marcado = el.classList.toggle('selected');
+    el.innerHTML = '<span class="o-desc">'+escHtml(zona)+'</span>' + (marcado ? '<span class="o-check">✓</span>' : '');
+  },
+  confirmarYExportar: function(){
+    var seleccionadas = [];
+    var items = document.querySelectorAll('#asignarZonasLista .ord-item.selected');
+    for (var i=0;i<items.length;i++){ seleccionadas.push(items[i].getAttribute('data-zona')); }
+    if (!seleccionadas.length){ toast('Elegí al menos una zona'); return; }
+    var lecturista = document.getElementById('asignarLecturistaInput').value.trim();
+
+    var payload = {
+      tipo: 'asignacion_zonas_gu',
+      lecturista: lecturista,
+      zonas: seleccionadas,
+      creadoEl: new Date().toISOString()
+    };
+    var json = JSON.stringify(payload, null, 2);
+    var blob = new Blob([json], {type:'application/json'});
+    var nombreArchivo = 'Asignacion_' + (lecturista ? lecturista.replace(/[^a-zA-Z0-9]+/g,'_') : 'zonas') + '.json';
+
+    if (navigator.canShare && navigator.share){
+      try {
+        var file = new File([blob], nombreArchivo, {type:'application/json'});
+        if (navigator.canShare({files:[file]})){
+          navigator.share({files:[file], title:'Asignación de zonas', text:'Zonas asignadas' + (lecturista?' a '+lecturista:'')})
+            ['catch'](function(err){ if (err && err.name!=='AbortError') toast('No se pudo enviar. Probá descargarlo.'); });
+          this.cerrarModal();
+          return;
+        }
+      } catch(e){}
+    }
+    downloadBlob(blob, nombreArchivo);
+    toast('Archivo de asignación descargado');
+    this.cerrarModal();
+  }
+};
+
+/* ---------------- Importar/aplicar asignación de zonas (en el celular del lecturista) ---------------- */
+var AsignacionMod = {
+  elegirArchivo: function(){
+    var input = document.getElementById('asignacionFileInput');
+    if (input) input.click();
+  },
+  onFileSelected: function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var payload;
+      try { payload = JSON.parse(e.target.result); }
+      catch(err){ toast('Ese archivo no es una asignación válida'); return; }
+      if (!payload || !payload.zonas || !payload.zonas.length){
+        toast('El archivo no tiene zonas para asignar');
+        return;
+      }
+      var zonasValidas = payload.zonas.filter(function(z){ return ZONAS.indexOf(z) >= 0; });
+      if (!zonasValidas.length){
+        toast('Ninguna de esas zonas coincide con las de esta app');
+        return;
+      }
+      var msg = 'Vas a mostrar solo estas '+zonasValidas.length+' zonas en Inicio' +
+        (payload.lecturista ? ' (asignación para '+payload.lecturista+')' : '') + '. ¿Aplicar?';
+      if (!confirm(msg)) return;
+      guardarZonasAsignadas(zonasValidas, {lecturista: payload.lecturista||'', creadoEl: payload.creadoEl||''});
+      verTodasLasZonas = false;
+      toast('Asignación aplicada ✓');
+      AsignacionMod.mostrarEstado();
+      if (App.stack[App.stack.length-1] === 'home') App.renderHome();
+    };
+    reader.onerror = function(){ toast('Error leyendo el archivo'); };
+    reader.readAsText(file, 'UTF-8');
+  },
+  mostrarEstado: function(){
+    var el = document.getElementById('zonasAsignadasEstadoTexto');
+    if (!el) return;
+    if (!ZONAS_ASIGNADAS.length){
+      el.textContent = 'Sin asignación importada — se muestran todas las zonas.';
+      return;
+    }
+    var quien = ZONAS_ASIGNADAS_META && ZONAS_ASIGNADAS_META.lecturista ? ' (' + ZONAS_ASIGNADAS_META.lecturista + ')' : '';
+    el.textContent = ZONAS_ASIGNADAS.length + ' zonas asignadas' + quien + ': ' + ZONAS_ASIGNADAS.join(', ');
+  },
+  borrar: function(){
+    if (!ZONAS_ASIGNADAS.length){ toast('No tenés ninguna asignación cargada'); return; }
+    if (!confirm('¿Quitar la asignación de zonas de este dispositivo? Vas a volver a ver todas las zonas.')) return;
+    borrarZonasAsignadas();
+    verTodasLasZonas = false;
+    toast('Asignación quitada');
+    AsignacionMod.mostrarEstado();
+    if (App.stack[App.stack.length-1] === 'home') App.renderHome();
   }
 };
 
