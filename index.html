@@ -3094,10 +3094,63 @@ function convertirHojaAnteriores(aoa){
       if (lbl2==='Lectura'){ lecturaSimple = String(val2).trim(); continue; }
       lecturaCodigos[lbl2] = String(val2).trim();
     }
+    /* Si el mismo medidor aparece más de una vez en la hoja (columnas repetidas,
+       ej. lectura anterior y actual juntas), nos quedamos con la ÚLTIMA —
+       normalmente es la más reciente. */
     out.push({med: medidor, lectura: lecturaSimple, lecturaCodigos: lecturaCodigos});
   }
   return out;
 }
+
+/* Formato alternativo "plano": una FILA por medidor, con encabezados
+   (NOMBRE, MDOR Nº, Lectura, ...) en una sola fila en vez de una columna
+   por medidor. Se usa como respaldo cuando convertirHojaAnteriores no
+   reconoce la hoja (formato transpuesto). */
+function convertirHojaAnterioresPlana(aoa){
+  function limpiar(v){ return (v==null?'':String(v)).trim(); }
+  var METADATA = {'NOMBRE':1,'I C Nº':1,'MDOR Nº':1,'FECHA':1,'LECTURISTA':1,'cargado':1,'Fecha':1,'Lectura':1,'OBSERVACION':1};
+  var idxHeader=-1, colNombre=-1, colMdor=-1, colLectura=-1;
+  var colsCodigo = []; // [{c, label}]
+  for (var i=0;i<aoa.length;i++){
+    var fila = aoa[i] || [];
+    var cN=-1, cM=-1;
+    for (var c=0;c<fila.length;c++){
+      var v = limpiar(fila[c]);
+      if (v==='NOMBRE') cN=c;
+      if (v==='MDOR Nº') cM=c;
+    }
+    if (cN>=0 && cM>=0){
+      idxHeader=i; colNombre=cN; colMdor=cM;
+      for (var c2=0;c2<fila.length;c2++){
+        var v2 = limpiar(fila[c2]);
+        if (!v2) continue;
+        if (v2==='Lectura'){ colLectura=c2; continue; }
+        if (METADATA.hasOwnProperty(v2)) continue;
+        colsCodigo.push({c:c2, label:v2});
+      }
+      break;
+    }
+  }
+  if (idxHeader===-1) return [];
+  var out=[];
+  for (var r=idxHeader+1;r<aoa.length;r++){
+    var row = aoa[r] || [];
+    var nombre = limpiar(row[colNombre]);
+    if (!nombre) continue;
+    var medidor = limpiar(row[colMdor]);
+    if (!medidor) continue;
+    var lecturaSimple = colLectura>=0 ? limpiar(row[colLectura]) : '';
+    var lecturaCodigos = {};
+    for (var k=0;k<colsCodigo.length;k++){
+      var val = row[colsCodigo[k].c];
+      if (val===undefined || val===null || String(val).trim()==='') continue;
+      lecturaCodigos[colsCodigo[k].label] = String(val).trim();
+    }
+    out.push({med: medidor, lectura: lecturaSimple, lecturaCodigos: lecturaCodigos});
+  }
+  return out;
+}
+
 
 var AnterioresMod = {
   elegirArchivo: function(){
@@ -3116,7 +3169,9 @@ var AnterioresMod = {
         var hojas = xlsxToSheets(datos);
         var todos = [];
         for (var s=0;s<hojas.length;s++){
-          todos = todos.concat(convertirHojaAnteriores(hojas[s].aoa));
+          var filas = convertirHojaAnteriores(hojas[s].aoa);
+          if (!filas.length) filas = convertirHojaAnterioresPlana(hojas[s].aoa);
+          todos = todos.concat(filas);
         }
         if (!todos.length){
           toast('No reconocí el formato de ese Excel (¿tiene NOMBRE / MDOR Nº como filas?)');
