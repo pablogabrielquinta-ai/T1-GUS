@@ -2281,16 +2281,24 @@ var App = {
   },
 
   renderExport: function(){
-    var total = USERS.length, done = 0;
-    for (var k in LECTURAS){
-      if (!LECTURAS.hasOwnProperty(k)) continue;
-      var r = LECTURAS[k];
-      if (hasLecturaValor(r) || (r.ordenativos && r.ordenativos.length)) done++;
+    var zonasVisibles = zonasAMostrar();
+    var mostrandoTodo = (zonasVisibles.length === ZONAS.length);
+    var total = 0, done = 0;
+    for (var i=0;i<USERS.length;i++){
+      var u = USERS[i];
+      if (!mostrandoTodo && zonasVisibles.indexOf(u.zona) === -1) continue;
+      total++;
+      var r = LECTURAS[u.med];
+      if (r && (hasLecturaValor(r) || (r.ordenativos && r.ordenativos.length))) done++;
     }
+    var notaZonas = (!mostrandoTodo)
+      ? '<div class="dh-row">📋 Exportando solo tus '+zonasVisibles.length+' zonas asignadas.</div>'
+      : '';
     var html =
       '<div class="detail-head">' +
         '<h2>Exportar relevamiento</h2>' +
         '<div class="dh-row"><b>'+done+'</b> de <b>'+total+'</b> medidores cargados</div>' +
+        notaZonas +
         '<div class="dh-row">Los datos quedan guardados en este dispositivo (offline) hasta que decidas borrarlos. Después de exportar, la app te pregunta si querés conservarlos o borrarlos.</div>' +
       '</div>' +
       '<fieldset><legend>Enviar ahora (sin cable)</legend>' +
@@ -2828,8 +2836,11 @@ var Detail = {
 var ExportMod = {
   buildRows: function(){
     var rows = [];
-    for (var i=0;i<USERS.length;i++){
-      var u = USERS[i];
+    var zonasVisibles = zonasAMostrar();
+    var mostrandoTodo = (zonasVisibles.length === ZONAS.length);
+    var usersAExportar = mostrandoTodo ? USERS : USERS.filter(function(u){ return zonasVisibles.indexOf(u.zona) >= 0; });
+    for (var i=0;i<usersAExportar.length;i++){
+      var u = usersAExportar[i];
       var r = LECTURAS[u.med] || {};
       var st = derivedStatus(r);
       var ordArr = r.ordenativos || [];
