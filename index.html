@@ -519,8 +519,8 @@ nav.bottomnav button.active{color:var(--amber);}
 <div class="modal-bg" id="asignarZonasModal">
   <div class="modal-box">
     <h3>Armar asignación de zonas</h3>
-    <label class="flabel">Nombre del lecturista (para identificar el archivo)</label>
-    <input type="text" id="asignarLecturistaInput" placeholder="Ej: LUGO, NORBERTO (703)">
+    <label class="flabel">Lecturista</label>
+    <select id="asignarLecturistaInput"></select>
     <label class="flabel" style="margin-top:10px">Zonas a asignar</label>
     <div class="ord-list" id="asignarZonasLista"></div>
     <div class="btnrow" style="margin-top:12px">
@@ -2884,7 +2884,11 @@ var ExportMod = {
 
     if (navigator.canShare && navigator.share){
       try {
-        var file = new File([blob], filename, {type:'text/csv'});
+        /* type:'text/plain' para compartir (no para el archivo en sí): muchos
+           navegadores de Android son estrictos con qué tipos de archivo dejan
+           compartir, y "text/csv" suele quedar afuera de esa lista aunque
+           "text/plain" sí funcione. No afecta cómo se lee el archivo después. */
+        var file = new File([blob], filename, {type:'text/plain'});
         if (navigator.canShare({files:[file]})){
           navigator.share({
             files:[file],
@@ -2899,7 +2903,7 @@ var ExportMod = {
         }
       } catch(e){}
     }
-    toast('Este celular no admite enviar archivos así. Descargalo y mandalo por WhatsApp.');
+    toast('Este celular no admite compartir así. Se descargó el archivo — buscalo en tus Descargas y compartilo por WhatsApp desde ahí.');
     this.exportCSV();
   },
 
@@ -3230,7 +3234,27 @@ var AsignarMod = {
       '</div>';
     }
     lista.innerHTML = html;
-    document.getElementById('asignarLecturistaInput').value = ZONAS_ASIGNADAS_META ? (ZONAS_ASIGNADAS_META.lecturista||'') : '';
+
+    var actual = ZONAS_ASIGNADAS_META ? (ZONAS_ASIGNADAS_META.lecturista||'') : '';
+    var agentesOrdenados = AGENTES.slice().sort(function(a,b){
+      if (a.tipo !== b.tipo) return a.tipo === 'Lecturista' ? -1 : 1;
+      return a.nombre.localeCompare(b.nombre);
+    });
+    var opciones = '<option value="">— Elegir lecturista —</option>';
+    var grupoActual = '';
+    for (var j=0;j<agentesOrdenados.length;j++){
+      var ag = agentesOrdenados[j];
+      var label = ag.nombre + ' (Cod. ' + ag.cod + ')';
+      if (ag.tipo !== grupoActual){
+        if (grupoActual) opciones += '</optgroup>';
+        opciones += '<optgroup label="'+escAttr(ag.tipo)+'s">';
+        grupoActual = ag.tipo;
+      }
+      opciones += '<option value="'+escAttr(label)+'"'+(label===actual?' selected':'')+'>'+escHtml(label)+'</option>';
+    }
+    if (grupoActual) opciones += '</optgroup>';
+    document.getElementById('asignarLecturistaInput').innerHTML = opciones;
+
     document.getElementById('asignarZonasModal').classList.add('show');
     App.pushNavState();
   },
@@ -3260,7 +3284,7 @@ var AsignarMod = {
 
     if (navigator.canShare && navigator.share){
       try {
-        var file = new File([blob], nombreArchivo, {type:'application/json'});
+        var file = new File([blob], nombreArchivo, {type:'text/plain'});
         if (navigator.canShare({files:[file]})){
           navigator.share({files:[file], title:'Asignación de zonas', text:'Zonas asignadas' + (lecturista?' a '+lecturista:'')})
             ['catch'](function(err){ if (err && err.name!=='AbortError') toast('No se pudo enviar. Probá descargarlo.'); });
@@ -3270,7 +3294,7 @@ var AsignarMod = {
       } catch(e){}
     }
     downloadBlob(blob, nombreArchivo);
-    toast('Archivo de asignación descargado');
+    toast('Este celular no admite compartir así. Se descargó el archivo — buscalo en tus Descargas y compartilo por WhatsApp desde ahí.');
     this.cerrarModal();
   }
 };
@@ -3349,7 +3373,7 @@ var BackupMod = {
 
       if (navigator.canShare && navigator.share){
         try {
-          var file = new File([blob], filename, {type:'application/json'});
+          var file = new File([blob], filename, {type:'text/plain'});
           if (navigator.canShare({files:[file]})){
             navigator.share({
               files:[file],
